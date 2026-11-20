@@ -276,6 +276,9 @@ class MainActivity : Activity() {
 
 
     private fun generatePlan() {
+        executionSession = null
+        pendingDocumentStepId = null
+        updateExecutionUi()
         val requestText = plannerRequest.text.toString()
         if (requestText.isBlank() || requestText.length > 4_000) {
             setStatus("درخواست باید بین ۱ تا ۴۰۰۰ نویسه باشد.")
@@ -289,9 +292,6 @@ class MainActivity : Activity() {
             setStatus("ابتدا کلید API خود را در همین برنامه ذخیره کنید.")
             return
         }
-        executionSession = null
-        pendingDocumentStepId = null
-        updateExecutionUi()
         val model = plannerModel.text.toString().trim()
         plannerButton.isEnabled = false
         plannerOutput.text = "در حال ساخت طرح ساختاریافته…"
