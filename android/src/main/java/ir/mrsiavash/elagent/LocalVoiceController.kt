@@ -3,6 +3,8 @@ package ir.mrsiavash.elagent
 import android.app.Activity
 import android.content.Intent
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -21,6 +23,11 @@ class LocalVoiceController(
     private var ttsReady = false
     private var closed = false
     private var cancelled = false
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val captureTimeout = Runnable {
+        onStatus("زمان ضبط به ۱۵ ثانیه رسید؛ ضبط متوقف شد.")
+        stop()
+    }
 
     fun start(): Boolean {
         if (closed) {
@@ -49,6 +56,8 @@ class LocalVoiceController(
                 putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
             }
             recognizer?.startListening(intent)
+            mainHandler.removeCallbacks(captureTimeout)
+            mainHandler.postDelayed(captureTimeout, 15_000L)
             true
         } catch (_: Exception) {
             onStatus("Could not start the on-device speech recognizer.")
@@ -56,10 +65,14 @@ class LocalVoiceController(
         }
     }
 
-    fun stop() { runCatching { recognizer?.stopListening() } }
+    fun stop() {
+        mainHandler.removeCallbacks(captureTimeout)
+        runCatching { recognizer?.stopListening() }
+    }
 
     fun cancel() {
         cancelled = true
+        mainHandler.removeCallbacks(captureTimeout)
         runCatching { recognizer?.cancel() }
     }
 
@@ -87,12 +100,14 @@ class LocalVoiceController(
     override fun onBeginningOfSpeech() = onStatus("در حال شنیدن فرمان…")
     override fun onEndOfSpeech() = onStatus("در حال پردازش محلی گفتار…")
     override fun onError(error: Int) {
+        mainHandler.removeCallbacks(captureTimeout)
         if (!cancelled) {
             onFinished()
             onStatus("تشخیص گفتار محلی ناموفق بود (کد $error). دوباره تلاش کن.")
         }
     }
     override fun onResults(results: android.os.Bundle?) {
+        mainHandler.removeCallbacks(captureTimeout)
         if (cancelled || closed) return
         onFinished()
         val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.trim().orEmpty()
@@ -106,6 +121,7 @@ class LocalVoiceController(
 
     fun close() {
         closed = true
+        mainHandler.removeCallbacks(captureTimeout)
         runCatching { recognizer?.cancel() }
         runCatching { recognizer?.destroy() }
         recognizer = null
