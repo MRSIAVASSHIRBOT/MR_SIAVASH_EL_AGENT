@@ -81,8 +81,9 @@ class HubClient(private val store: SecureStore) {
             "Hub returned invalid credential lifetimes."
         }
         val scopes = result.optJSONArray("scopes") ?: throw IllegalStateException("Hub omitted granted scopes.")
-        require(scopes.length() == 1 && scopes.optString(0) == "device.heartbeat") {
-            "This Android preview accepts only the device.heartbeat scope. Create a new pairing challenge with that single scope."
+        val grantedScopes = (0 until scopes.length()).map { scopes.optString(it) }.toSet()
+        require(AndroidTaskPolicy.areSupportedScopes(grantedScopes)) {
+            "Android supports only device.heartbeat and app.launch scopes in this preview."
         }
         val now = System.currentTimeMillis()
         val saved = store.read()
