@@ -183,3 +183,22 @@ def test_heartbeat_without_pairing_never_contacts_network(tmp_path, monkeypatch)
     _use_tmp_data_dir(monkeypatch, tmp_path)
     monkeypatch.setattr(hub, "urlopen", lambda *_args, **_kwargs: pytest.fail("unexpected network request"))
     assert hub.heartbeat_once() == {"paired": False, "status": "not_paired"}
+
+
+def test_corrupt_stored_hub_url_fails_before_any_network_request(tmp_path, monkeypatch):
+    _use_tmp_data_dir(monkeypatch, tmp_path)
+    now = datetime.now(timezone.utc)
+    hub.device_id_path().parent.mkdir(parents=True, exist_ok=True)
+    device_id = hub.get_device_id()
+    hub._save_credentials({
+        "hub_url": "http://attacker.example.test",
+        "device_id": device_id,
+        "access_token": _token("a"),
+        "refresh_token": _token("r"),
+        "access_expires_at": (now + timedelta(minutes=10)).isoformat(),
+        "refresh_expires_at": (now + timedelta(days=10)).isoformat(),
+        "scopes": ["device.heartbeat"],
+    })
+    monkeypatch.setattr(hub, "urlopen", lambda *_args, **_kwargs: pytest.fail("credentials must be rejected before network"))
+    with pytest.raises(hub.HubClientError, match="failed validation"):
+        hub.heartbeat_once()
