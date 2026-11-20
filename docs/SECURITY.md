@@ -6,7 +6,7 @@ Allowed operations are explicit screenshot capture, launching a fixed applicatio
 
 Arbitrary shell or script execution, caller-supplied executable paths and URLs, keystroke logging, hidden capture, microphone recording, credential collection, unrestricted file access, unattended messaging/publishing/purchases, and non-loopback network exposure are excluded.
 
-Run as the normal desktop user, not elevated administrator. Keep the token private. Screenshot files remain local under the application data directory. Do not expose the token to browser JavaScript. Optional Hub pairing uses a five-minute owner-created one-time challenge, short-lived device access credentials, rotating refresh credentials, owner-side revocation, and a heartbeat scope only. The companion sends only device ID, agent version, runtime state, and uptime to the configured Hub. It never forwards the local API token. HTTP Hub URLs are accepted only for localhost; external Hub origins must use HTTPS. The local device credential file is stored under the current user's application-data directory. Hub task dispatch and shared-memory synchronization are not yet enabled.
+Run as the normal desktop user, not elevated administrator. Keep the token private. Screenshot files remain local under the application data directory. Do not expose the token to browser JavaScript. Optional Hub pairing uses a five-minute owner-created one-time challenge, short-lived device access credentials, rotating refresh credentials, owner-side revocation, and exact owner-granted device scopes. The companion sends only device ID, agent version, runtime state, and uptime to the configured Hub. It never forwards the local API token. HTTP Hub URLs are accepted only for localhost; external Hub origins must use HTTPS. The local device credential file is stored under the current user's application-data directory. Android Hub task claiming is manual and foreground-only; only app.launch with the exact app.launch scope is supported, each task requires an on-device approve/reject dialog, and screenshots or background launches are excluded. Lease-expired tasks are never replayed. Shared-memory synchronization remains disabled.
 
 
 ## Android online planner trust boundary
@@ -21,3 +21,12 @@ Run as the normal desktop user, not elevated administrator. Keep the token priva
 - A failed step stops the plan. The execution ledger is in-memory only, so activity/process recreation loses the plan state and never triggers automatic action replay.
 - File contents, microphone audio, screenshots, Hub credentials, and local memory are not included in planner requests.
 - API usage can incur provider charges separate from a ChatGPT subscription. The owner must explicitly save an API key in the app and tap the planning action.
+
+
+## Android Hub task boundary
+
+- The Android client requests only the owner-granted `device.heartbeat` and optional `app.launch` scopes; it rejects `screen.capture` and every unknown scope.
+- Task claiming happens only after an explicit foreground tap. Every supported app launch requires a separate approve/reject dialog.
+- Only the fixed ChatGPT/browser aliases are launchable. No arbitrary package name, URL, shell, screenshot, or background UI launch is accepted.
+- Task identity, device binding, exact required scope, lease token, and lease expiry are validated before use and before reporting.
+- The Hub treats device outcomes as unverified. Expired leases are not replayed automatically.
