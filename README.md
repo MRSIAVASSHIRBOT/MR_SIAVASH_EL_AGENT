@@ -2,7 +2,7 @@
 
 **Personal Digital Operator — Windows-first local MVP**
 
-A device-side companion for the MR_SIAVASH ecosystem. This first usable release provides a local Windows API and a simple CLI for explicit screenshot capture, allowlisted application launch, and scheduled application launch.
+A device-side companion for the MR_SIAVASH ecosystem. This release provides a local Windows API, CLI, and a Tk desktop control center for explicit screenshot capture, allowlisted application launch, Persian/English quick commands, and scheduled application launch.
 
 ## What works in this MVP
 
@@ -12,6 +12,8 @@ A device-side companion for the MR_SIAVASH ecosystem. This first usable release 
 - Launch Notepad, Calculator, Explorer, the default browser on a blank page, or ChatGPT at its fixed official URL.
 - Schedule one of those app launches up to 30 days ahead.
 - List and cancel pending scheduled tasks.
+- Desktop control center with task listing/cancellation and ISO-8601 scheduling.
+- A deterministic Persian/English command parser for a small allowlist (e.g. «اسکرین‌شات بگیر» and «برو داخل چت جی پی تی»); unknown commands are rejected.
 - CLI commands so everyday use does not require Swagger or custom scripts.
 
 The Hub remains the future authority for identity, shared memory, remote scheduling, policy, and multi-device coordination. This repository owns the local Windows companion runtime.
@@ -83,4 +85,4 @@ See docs/ROADMAP.md and docs/SECURITY.md. CI tests Windows and Linux with Python
 
 ## Status
 
-The Windows-first MVP is merged into main. Its automated test matrix passes on Windows and Ubuntu with Python 3.11 and 3.12. A clean Windows 11 installation and live screenshot/application-launch acceptance test are still required before calling the desktop behavior verified. The scheduled ChatGPT shortcut opens ChatGPT only; sending prompts or automating a conversation is not implemented. Android, browser extension, Hub pairing, shared memory, and cloud scheduling remain planned.
+The Windows-first MVP is merged into main. The desktop control center and bounded Persian/English command grammar are being added in the next release. Automated CI is required on Windows and Ubuntu with Python 3.11 and 3.12; a clean Windows 11 installation and live screenshot/application-launch acceptance test are still required before calling desktop behavior verified. The scheduled ChatGPT shortcut opens ChatGPT only; sending prompts or automating a conversation is not implemented. Android, browser extension, Hub pairing, shared memory, and cloud scheduling remain planned.
