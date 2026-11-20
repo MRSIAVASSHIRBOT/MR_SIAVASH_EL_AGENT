@@ -15,7 +15,7 @@ from uuid import UUID, uuid4
 
 from el_agent.service import data_dir
 
-AGENT_VERSION = "0.1.0"
+AGENT_VERSION = "0.2.0"
 HEARTBEAT_INTERVAL_SECONDS = 60
 HEARTBEAT_REFRESH_WINDOW_SECONDS = 120
 AGENT_STARTED_AT = time.monotonic()
