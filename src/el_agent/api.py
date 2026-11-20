@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, field_validator
 from el_agent.actions import APP_ALLOWLIST, capture_screenshot, launch_app
 from el_agent.security import load_token, token_matches
-from el_agent.service import screenshot_dir, task_store, scheduler_loop, hub_heartbeat_loop
+from el_agent.service import screenshot_dir, task_store, scheduler_loop, hub_heartbeat_loop, hub_task_loop
 from el_agent.store import TaskStore
 
 class ScheduleRequest(BaseModel):
@@ -38,12 +38,13 @@ def create_app(*, token: str | None = None, store: TaskStore | None = None, scre
     async def lifespan(app: FastAPI):
         worker = asyncio.create_task(scheduler_loop(db))
         hub_worker = asyncio.create_task(hub_heartbeat_loop())
+        task_worker = asyncio.create_task(hub_task_loop())
         try:
             yield
         finally:
             worker.cancel()
             hub_worker.cancel()
-            for task in (worker, hub_worker):
+            for task in (worker, hub_worker, task_worker):
                 try:
                     await task
                 except asyncio.CancelledError:
