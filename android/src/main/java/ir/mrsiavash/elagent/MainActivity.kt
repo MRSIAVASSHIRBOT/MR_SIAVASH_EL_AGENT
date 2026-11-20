@@ -38,8 +38,6 @@ class MainActivity : Activity() {
     private val recordAudioRequest = 4102
     private val openDocumentRequest = 4103
     private lateinit var documentPreview: TextView
-    private lateinit var plannerApiKey: EditText
-    private lateinit var plannerModel: EditText
     private lateinit var plannerRequest: EditText
     private lateinit var plannerButton: Button
     private lateinit var plannerOutput: TextView
@@ -47,6 +45,7 @@ class MainActivity : Activity() {
     private lateinit var executionNextButton: Button
     private lateinit var executionVerifyButton: Button
     private var executionSession: AgentPlanExecutionSession? = null
+    private var plannerFailureMessage: String? = "هنوز طرحی ساخته نشده است."
     private var pendingDocumentStepId: String? = null
     private var activityInForeground = false
     private val executionDocumentRequest = 4104
@@ -168,46 +167,26 @@ class MainActivity : Activity() {
             textSize = 17f
             setTextColor(Color.rgb(53, 214, 160))
         }, fieldParams())
-        plannerApiKey = EditText(this).apply {
-            hint = "کلید OpenAI API (ذخیره‌شده به‌صورت رمزگذاری‌شده)"
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
-            setTextColor(Color.WHITE)
-            setHintTextColor(Color.rgb(145, 170, 158))
-            setSingleLine(true)
-        }
-        root.addView(plannerApiKey, fieldParams())
-        root.addView(Button(this).apply {
-            text = "ذخیره امن کلید API"
-            setOnClickListener {
-                runCatching { store.saveCloudApiKey(plannerApiKey.text.toString()) }
-                    .onSuccess {
-                        plannerApiKey.text.clear()
-                        setStatus("کلید در محفظهٔ رمزگذاری‌شدهٔ Android ذخیره شد.")
-                    }
-                    .onFailure { setStatus(it.message ?: "ذخیرهٔ کلید ناموفق بود.") }
-            }
-        }, buttonParams())
-        root.addView(Button(this).apply {
-            text = "حذف کلید API"
-            setOnClickListener {
-                runCatching { store.clearCloudApiKey() }
-                    .onSuccess {
-                        plannerApiKey.text.clear()
-                        setStatus("کلید API از حافظهٔ رمزگذاری‌شده حذف شد.")
-                    }
-                    .onFailure { setStatus(it.message ?: "حذف کلید ناموفق بود.") }
-            }
-        }, buttonParams())
-        plannerModel = EditText(this).apply {
-            hint = "شناسهٔ مدل فعال در حساب API"
-            setText("gpt-6.1-terra")
-            setTextColor(Color.WHITE)
-            setHintTextColor(Color.rgb(145, 170, 158))
-            setSingleLine(true)
-        }
-        root.addView(plannerModel, fieldParams())
         root.addView(TextView(this).apply {
-            text = "درخواست فقط برای ساخت طرح به API ارسال می‌شود؛ فایل، تصویر، صدای میکروفون و حافظه ارسال نمی‌شوند. استفاده از API ممکن است هزینهٔ جداگانه داشته باشد."
+            text = "ارائه‌دهنده‌های رایگان · Gemini سپس Groq سپس OpenRouter"
+            textSize = 14f
+            setTextColor(Color.rgb(232, 245, 239))
+        }, fieldParams())
+        root.addView(TextView(this).apply {
+            text = "کلید هر سرویس اختیاری است و فقط در محفظهٔ رمزگذاری‌شدهٔ Android ذخیره می‌شود. برنامه فقط بین کلیدهای ذخیره‌شده جابه‌جا می‌شود و هیچ مسیر پولی یا ارتقای خودکاری ندارد. سهمیه و شرایط رایگان هر حساب را در پنل همان سرویس بررسی کنید."
+            textSize = 12f
+            setTextColor(Color.rgb(190, 205, 196))
+        }, fieldParams())
+        addFreeProviderKeyEditor(root, "gemini", "Google Gemini")
+        addFreeProviderKeyEditor(root, "groq", "Groq")
+        addFreeProviderKeyEditor(root, "openrouter", "OpenRouter")
+        root.addView(TextView(this).apply {
+            text = "مدل‌های پیش‌فرض: gemini-4-hydrogen · openai/gpt-oss-20b · openrouter/free. کلید قدیمی OpenAI حذف نمی‌شود، اما برنامه‌ریز رایگان از آن استفاده نمی‌کند."
+            textSize = 12f
+            setTextColor(Color.rgb(190, 205, 196))
+        }, fieldParams())
+        root.addView(TextView(this).apply {
+            text = "فقط درخواست متنی واردشده به برنامه‌ریز ارسال می‌شود؛ فایل، تصویر، صدای میکروفون، اسکرین‌شات و حافظهٔ محلی ارسال نمی‌شوند. طرح خروجی پیش از نمایش، محلی اعتبارسنجی می‌شود."
             textSize = 12f
             setTextColor(Color.rgb(190, 205, 196))
         }, fieldParams())
@@ -282,15 +261,6 @@ class MainActivity : Activity() {
             setStatus("درخواست باید بین ۱ تا ۴۰۰۰ نویسه باشد.")
             return
         }
-        val key = runCatching { store.cloudApiKey() }.getOrElse {
-            setStatus("خواندن کلید امن API ناموفق بود.")
-            return
-        }
-        if (key.isBlank()) {
-            setStatus("ابتدا کلید API خود را در همین برنامه ذخیره کنید.")
-            return
-        }
-        val model = plannerModel.text.toString().trim()
         val previous = executionSession
         if (previous != null && !previous.isComplete()) {
             AlertDialog.Builder(this)
@@ -301,41 +271,48 @@ class MainActivity : Activity() {
                 )
                 .setNegativeButton("ادامهٔ طرح قبلی", null)
                 .setPositiveButton("کنارگذاشتن و ساخت طرح جدید") { _, _ ->
-                    startPlanGeneration(requestText, key, model)
+                    startPlanGeneration(requestText)
                 }
                 .show()
         } else {
-            startPlanGeneration(requestText, key, model)
+            startPlanGeneration(requestText)
         }
     }
 
-    private fun startPlanGeneration(requestText: String, key: String, model: String) {
+    private fun startPlanGeneration(requestText: String) {
         executionSession = null
         pendingDocumentStepId = null
+        plannerFailureMessage = "در حال ساخت طرح؛ هنوز مرحله‌ای برای اجرا وجود ندارد."
         updateExecutionUi()
         plannerButton.isEnabled = false
-        plannerOutput.text = "در حال ساخت طرح ساختاریافته…"
-        setStatus("درخواست متنی به مدل آنلاین ارسال شد.")
+        plannerOutput.text = "در حال ساخت طرح ساختاریافته با سرویس‌های رایگان…"
+        setStatus("درخواست فقط به ارائه‌دهنده‌های رایگانِ دارای کلید ذخیره‌شده ارسال می‌شود.")
         plannerExecutor.execute {
             val result = runCatching {
-                val provider = OpenAiChatProvider(key, model)
-                val raw = provider.chatJson(
+                val routed = FreeProviderPlanRouter(store).generate(
                     AgentPlanPrompt.SYSTEM_PROMPT,
                     AgentPlanPrompt.userMessage(requestText)
                 )
-                AgentPlanParser.parse(raw)
+                val plan = AgentPlanParser.parse(routed.json)
+                plan to routed
             }
             runOnUiThread {
                 plannerButton.isEnabled = true
-                result.onSuccess { plan ->
+                result.onSuccess { (plan, routed) ->
                     executionSession = if (plan.steps.isNotEmpty()) AgentPlanExecutionSession(plan) else null
                     pendingDocumentStepId = null
+                    plannerFailureMessage = if (plan.steps.isEmpty()) {
+                        "طرح اجرایی ساخته نشد؛ مدل برای ادامه به توضیح بیشتر نیاز دارد."
+                    } else null
                     plannerOutput.text = AgentPlanPolicy.render(plan)
-                    setStatus("طرح دریافت و اعتبارسنجی شد؛ هیچ مرحله‌ای هنوز اجرا نشده است.")
+                    setStatus("طرح از " + routed.provider.label + " دریافت و محلی اعتبارسنجی شد؛ هیچ مرحله‌ای هنوز اجرا نشده است.")
                     updateExecutionUi()
                 }.onFailure { error ->
-                    plannerOutput.text = "ساخت یا اعتبارسنجی طرح ناموفق بود: ${error.message ?: "خطای نامشخص"}"
-                    setStatus("طرح نامعتبر یا سرویس آنلاین ناموفق بود.")
+                    plannerFailureMessage = "طرحی برای اجرا وجود ندارد؛ ساخت طرح ناموفق بود. " +
+                        (error.message ?: "لطفاً اتصال، کلیدها و سهمیهٔ سرویس‌های رایگان را بررسی کنید.")
+                    plannerOutput.text = plannerFailureMessage
+                    setStatus("هیچ طرح معتبری تولید نشد؛ درخواست شما در کادر ورودی باقی مانده است.")
+                    updateExecutionUi()
                 }
             }
         }
@@ -529,7 +506,7 @@ class MainActivity : Activity() {
         if (!::executionStatus.isInitialized) return
         val session = executionSession
         if (session == null) {
-            executionStatus.text = "این طرح مرحلهٔ اجرایی ندارد یا هنوز طرحی تولید نشده است."
+            executionStatus.text = plannerFailureMessage ?: "طرحی برای اجرا وجود ندارد."
             executionNextButton.visibility = ViewGroup.GONE
             executionVerifyButton.visibility = ViewGroup.GONE
             return
@@ -683,6 +660,39 @@ class MainActivity : Activity() {
             "browser" -> startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com/")))
             else -> throw IllegalArgumentException("Unsupported Android app alias.")
         }
+    }
+
+    private fun addFreeProviderKeyEditor(root: LinearLayout, providerId: String, providerLabel: String) {
+        val field = EditText(this).apply {
+            hint = "کلید API · " + providerLabel
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.rgb(145, 170, 158))
+            setSingleLine(true)
+        }
+        root.addView(field, fieldParams())
+        root.addView(Button(this).apply {
+            text = "ذخیره امن کلید · " + providerLabel
+            setOnClickListener {
+                runCatching { store.saveProviderApiKey(providerId, field.text.toString()) }
+                    .onSuccess {
+                        field.text.clear()
+                        setStatus("کلید " + providerLabel + " در حافظهٔ رمزگذاری‌شده ذخیره شد.")
+                    }
+                    .onFailure { setStatus(it.message ?: "ذخیرهٔ کلید ناموفق بود.") }
+            }
+        }, buttonParams())
+        root.addView(Button(this).apply {
+            text = "حذف کلید · " + providerLabel
+            setOnClickListener {
+                runCatching { store.clearProviderApiKey(providerId) }
+                    .onSuccess {
+                        field.text.clear()
+                        setStatus("کلید " + providerLabel + " حذف شد.")
+                    }
+                    .onFailure { setStatus(it.message ?: "حذف کلید ناموفق بود.") }
+            }
+        }, buttonParams())
     }
 
     private fun fieldParams() = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
