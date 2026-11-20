@@ -34,6 +34,8 @@ class MainActivity : Activity() {
     private lateinit var voiceButton: Button
     private var voiceActive = false
     private val recordAudioRequest = 4102
+    private val openDocumentRequest = 4103
+    private lateinit var documentPreview: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -130,6 +132,23 @@ class MainActivity : Activity() {
                     .onFailure { setStatus(it.message ?: "Could not open browser.") }
             }
         }, buttonParams())
+        root.addView(Button(this).apply {
+            text = "انتخاب و پیش‌نمایش فایل متنی"
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(13, 33, 25))
+            setTextColor(Color.rgb(53, 214, 160))
+            setOnClickListener {
+                runCatching {
+                    startActivityForResult(AndroidDocumentAccess.createOpenDocumentIntent(), openDocumentRequest)
+                }.onFailure { setStatus(it.message ?: "بازکردن انتخاب‌گر فایل ناموفق بود.") }
+            }
+        }, buttonParams())
+        documentPreview = TextView(this).apply {
+            text = "فایل فقط پس از انتخاب مستقیم شما خوانده می‌شود. پیش‌نمایش متنی حداکثر ۶۴ کیلوبایت است و به Cloud ارسال نمی‌شود."
+            textSize = 13f
+            setTextColor(Color.rgb(210, 226, 217))
+            setTextIsSelectable(true)
+        }
+        root.addView(documentPreview, fieldParams())
         root.addView(Button(this).apply {
             text = "Unpair locally"
             backgroundTintList = ColorStateList.valueOf(Color.rgb(74, 36, 31))
