@@ -68,6 +68,42 @@ Cancel a pending task:
 
     .\.venv\Scripts\el-agent.exe cancel TASK_ID
 
+## Pair with MR_SIAVASH_HUB_AI (heartbeat scope only)
+
+The Hub API must be deployed and reachable over HTTPS (HTTP is accepted only for localhost). Pairing is owner-initiated and the one-time code expires after five minutes.
+
+1. Get this installation's stable device ID and least-privilege pairing payload:
+
+       .\.venv\Scripts\el-agent.exe device-id
+
+2. In the same PowerShell session, set your Hub owner access token (do not commit it or paste it into source files):
+
+       $env:MRHUB_OWNER_TOKEN = "PASTE_OWNER_ACCESS_TOKEN"
+
+3. Create an owner-authorized pairing challenge. Replace the Hub origin and use the device ID printed in step 1:
+
+       $HubUrl = "https://YOUR-HUB-ORIGIN"
+       $Payload = @{
+         device_id = "PASTE_DEVICE_ID"
+         platform = "windows"
+         label = "Windows personal assistant"
+         advertised_capabilities = @("device.heartbeat", "screen.capture", "app.launch")
+         scopes = @("device.heartbeat")
+       } | ConvertTo-Json
+       $Challenge = Invoke-RestMethod -Uri "$HubUrl/devices/pairing-challenges" -Method Post -Headers @{ Authorization = "Bearer $env:MRHUB_OWNER_TOKEN" } -ContentType "application/json" -Body $Payload
+
+4. Pair locally. The command prompts for the short-lived code without echoing it:
+
+       .\.venv\Scripts\el-agent.exe pair --hub-url $HubUrl
+
+5. Check pairing and granted scope:
+
+       .\.venv\Scripts\el-agent.exe hub-status
+
+Once paired, the local Agent sends a minimal heartbeat when its API starts. Only the device ID, agent version, runtime state, and uptime are sent. The first release does not accept remote tasks or access screenshots/files through Hub.
+
+To disconnect, run el-agent unpair to remove local credentials, then revoke the device from the Hub owner device registry using DELETE /devices/{device_id}. Local unpairing alone does not revoke the Hub-side device record.
+
 Optional: start the local Agent automatically after this Windows user signs in (no administrator elevation required):
 
     .\\install-startup.ps1
