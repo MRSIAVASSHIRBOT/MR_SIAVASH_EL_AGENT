@@ -101,27 +101,5 @@ class HubClient(private val store: SecureStore) {
         return "Hub heartbeat: ${response.optString("status", "unknown")}"
     }
 
-    fun claimNextTask(): JSONObject? {
-        val saved = refreshIfNeeded()
-        val scopes = saved.optJSONArray("scopes") ?: throw IllegalStateException("No granted scopes found.")
-        val allowed = (0 until scopes.length()).any { scopes.optString(it) == "app.launch" }
-        require(allowed) { "This Android device has not been granted the app.launch scope." }
-        val response = request(
-            saved.getString("hub_url"), "/devices/tasks/claim", JSONObject(),
-            saved.getString("access_token"), saved.getString("device_id")
-        )
-        return response.optJSONObject("task")
-    }
-
-    fun completeTask(taskId: String, outcome: String, resultCode: String): String {
-        val saved = refreshIfNeeded()
-        val response = request(
-            saved.getString("hub_url"), "/devices/tasks/$taskId/complete",
-            JSONObject().put("outcome", outcome).put("result_code", resultCode),
-            saved.getString("access_token"), saved.getString("device_id")
-        )
-        return response.optJSONObject("task")?.optString("status") ?: "unknown"
-    }
-
     fun isPaired(): Boolean = store.read().has("refresh_token")
 }
