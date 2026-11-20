@@ -33,6 +33,12 @@ object DocumentAccessPolicy {
         return normalized.startsWith("text/") || normalized in supportedExactTypes
     }
 
+    fun canPersistReadPermission(resultFlags: Int): Boolean {
+        val read = resultFlags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0
+        val persistable = resultFlags and Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION != 0
+        return read && persistable
+    }
+
     fun decodeUtf8(bytes: ByteArray): String {
         require(bytes.size <= MAX_DOCUMENT_BYTES) { "Selected document exceeds the 64 KiB preview limit." }
         require(bytes.none { it == 0.toByte() }) { "Binary documents are not supported by the text preview." }
@@ -53,13 +59,14 @@ object AndroidDocumentAccess {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
         }
 
-    fun persistReadPermission(resolver: ContentResolver, uri: Uri, resultFlags: Int) {
+    /** Returns true when access was persisted; a temporary picker grant remains usable for this session. */
+    fun persistReadPermission(resolver: ContentResolver, uri: Uri, resultFlags: Int): Boolean {
         require(uri.scheme == ContentResolver.SCHEME_CONTENT) { "Only Android content-provider URIs are supported." }
         val readGranted = resultFlags and Intent.FLAG_GRANT_READ_URI_PERMISSION
         require(readGranted != 0) { "Android did not grant read access to the selected document." }
-        val persistableGranted = resultFlags and Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
-        require(persistableGranted != 0) { "The selected provider did not grant persistent document access." }
+        if (!DocumentAccessPolicy.canPersistReadPermission(resultFlags)) return false
         resolver.takePersistableUriPermission(uri, readGranted)
+        return true
     }
 
     fun readTextPreview(resolver: ContentResolver, uri: Uri): DocumentTextPreview {
