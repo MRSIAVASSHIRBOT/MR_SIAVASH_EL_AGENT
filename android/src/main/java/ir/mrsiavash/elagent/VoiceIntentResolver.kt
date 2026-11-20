@@ -2,23 +2,39 @@ package ir.mrsiavash.elagent
 
 import java.util.Locale
 
-/** Maps a transcript to a tiny, explicit action allowlist. Ambiguous or unknown speech is rejected. */
+/** Maps an explicit transcript to a tiny action allowlist; incidental mentions are never commands. */
 object VoiceIntentResolver {
+    private val launchVerbs = listOf("open", "launch", "start")
+    private val chatAliases = listOf("chatgpt", "chat gpt", "چت جی پی تی")
+    private val browserAliases = listOf("browser", "مرورگر", "مرورگر اینترنت")
+
     fun resolve(transcript: String): String? {
-        val normalized = transcript.lowercase(Locale.ROOT)
+        val command = transcript.lowercase(Locale.ROOT)
             .replace("ي", "ی")
             .replace("ك", "ک")
             .replace("‌", " ")
+            .replace(Regex("[!?؟،,.؛:]+"), " ")
             .replace(Regex("\\s+"), " ")
             .trim()
-        if (normalized.isEmpty()) return null
+            .removePrefix("لطفاً ")
+            .removePrefix("لطفا ")
+            .trim()
+        if (command.isEmpty() || command.length > 160) return null
 
-        val chatGpt = normalized.contains("چت جی پی تی") ||
-            Regex("""(?<![a-z0-9])chatgpt(?![a-z0-9])""").containsMatchIn(normalized) ||
-            Regex("""(?<![a-z0-9])chat\s*gpt(?![a-z0-9])""").containsMatchIn(normalized)
-        val browser = normalized.contains("مرورگر") ||
-            Regex("""(?<![a-z0-9])browser(?![a-z0-9])""").containsMatchIn(normalized)
+        fun isExplicitLaunch(aliases: List<String>): Boolean = aliases.any { alias ->
+            command in launchVerbs.map { "$it $alias" } ||
+                command in listOf(
+                    "باز کن $alias",
+                    "اجرا کن $alias",
+                    "برو به $alias",
+                    "$alias رو باز کن",
+                    "$alias را باز کن",
+                    "$alias باز کن",
+                )
+        }
 
+        val chatGpt = isExplicitLaunch(chatAliases)
+        val browser = isExplicitLaunch(browserAliases)
         return when {
             chatGpt && !browser -> "chatgpt"
             browser && !chatGpt -> "browser"
