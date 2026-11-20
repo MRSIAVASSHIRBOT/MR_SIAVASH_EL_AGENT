@@ -8,11 +8,25 @@ from typing import Literal
 from uuid import UUID
 from fastapi import Depends, FastAPI, Header, HTTPException, status
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from el_agent.actions import APP_ALLOWLIST, capture_screenshot, launch_app
 from el_agent.security import load_token, token_matches
 from el_agent.service import screenshot_dir, task_store, scheduler_loop, hub_heartbeat_loop
 from el_agent.store import TaskStore
+from el_agent.providers import ProviderError, ProviderRouter
+
+class ChatRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    prompt: str = Field(min_length=1, max_length=8000)
+    mode: Literal["local", "online", "hybrid"] = "local"
+
+    @field_validator("prompt")
+    @classmethod
+    def validate_prompt(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("prompt must not be blank")
+        return value.strip()
+
 
 class ScheduleRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -61,7 +75,24 @@ def create_app(*, token: str | None = None, store: TaskStore | None = None, scre
     async def device(_: None = Depends(auth)):
         return {"platform":"windows","mode":"local","remote_access":False,
                 "supported_apps":sorted([*APP_ALLOWLIST,"browser","chatgpt"]),
-                "capabilities":["device.heartbeat","screen.capture.explicit","app.launch.allowlisted","task.schedule.launch"]}
+                "capabilities":["device.heartbeat","screen.capture.explicit","app.launch.allowlisted","task.schedule.launch","assistant.chat.local","assistant.chat.online.opt_in","assistant.chat.hybrid.opt_in"]}
+    @app.post("/v1/assistant/chat")
+    async def assistant_chat(payload: ChatRequest, _: None = Depends(auth)):
+        try:
+            result = await asyncio.to_thread(ProviderRouter().chat, payload.prompt, payload.mode)
+            return {
+                "content": result.content,
+                "provider": result.provider,
+                "model": result.model,
+                "mode": result.mode,
+                "latency_ms": result.latency_ms,
+                "fallback_used": result.fallback_used,
+            }
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except ProviderError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+
     @app.post("/v1/screenshot",status_code=201)
     async def screenshot(_: None = Depends(auth)):
         try: return capture_screenshot(output)

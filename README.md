@@ -75,6 +75,26 @@ Cancel a pending task:
 - A task left in `running` after a process restart is marked `unknown_outcome`; it is never replayed because the previous launch may already have taken effect.
 - Use `el-agent tasks` to inspect the final status. Unknown outcomes require owner review; the scheduler will not guess or retry.
 
+## Text intelligence (Windows)
+
+The Windows agent provides explicit `local`, `online`, and `hybrid` text-chat modes. Local is the default and uses Ollama at `127.0.0.1:11434`; online and hybrid require a separately configured API key and model ID.
+
+```powershell
+# Local only; no prompt is sent to a cloud provider
+el-agent chat --mode local "سلام، خودت را معرفی کن"
+
+# Optional cloud API; configure the model ID and OS-stored key first
+$env:EL_AGENT_CLOUD_MODEL = "YOUR_ENABLED_API_MODEL_ID"
+el-agent provider-key set
+el-agent chat --mode online "Explain hybrid AI"
+
+# Cloud-first with local Ollama fallback
+el-agent chat --mode hybrid "Compare local and cloud inference"
+el-agent ai-status
+```
+
+Online API usage may incur separate charges. Model output is plain text only and cannot execute tools, shell commands, or device actions. See [docs/PROVIDER_SETUP.md](docs/PROVIDER_SETUP.md).
+
 ## Voice assistant (Windows push-to-talk)
 
 The first voice release is opt-in and local-only. It does not keep the microphone open, detect the wake word, or upload audio.
