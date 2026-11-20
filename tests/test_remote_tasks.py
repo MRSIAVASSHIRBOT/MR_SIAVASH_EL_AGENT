@@ -170,17 +170,27 @@ def test_expired_lease_prevents_action_and_completion_post(monkeypatch):
 
 
 def test_action_finishing_after_lease_expiry_is_not_reported_or_replayed(monkeypatch):
-    import time
+    real_datetime = datetime
+    started_at = real_datetime.now(timezone.utc)
+    lease_expiry = started_at + timedelta(seconds=30)
+
+    class ControlledDateTime(real_datetime):
+        current = started_at
+
+        @classmethod
+        def now(cls, tz=None):
+            return cls.current if tz is not None else cls.current.replace(tzinfo=None)
 
     claimed = _claimed()
-    claimed["lease_expires_at"] = (datetime.now(timezone.utc) + timedelta(milliseconds=20)).isoformat()
+    claimed["lease_expires_at"] = lease_expiry.isoformat()
     launched = []
 
-    def slow_launch(alias):
+    def launch_and_advance_clock(alias):
         launched.append(alias)
-        time.sleep(0.04)
+        ControlledDateTime.current = lease_expiry + timedelta(milliseconds=1)
 
-    monkeypatch.setattr(remote_tasks, "launch_app", slow_launch)
+    monkeypatch.setattr(remote_tasks, "datetime", ControlledDateTime)
+    monkeypatch.setattr(remote_tasks, "launch_app", launch_and_advance_clock)
     monkeypatch.setattr(
         remote_tasks, "_post",
         lambda *_args, **_kwargs: pytest.fail("late task outcome must not be posted"),
