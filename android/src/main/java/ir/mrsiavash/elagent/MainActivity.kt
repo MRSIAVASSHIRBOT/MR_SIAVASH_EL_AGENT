@@ -2,6 +2,7 @@ package ir.mrsiavash.elagent
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.content.Intent
@@ -41,6 +42,13 @@ class MainActivity : Activity() {
     private lateinit var plannerRequest: EditText
     private lateinit var plannerButton: Button
     private lateinit var plannerOutput: TextView
+    private lateinit var executionStatus: TextView
+    private lateinit var executionNextButton: Button
+    private lateinit var executionVerifyButton: Button
+    private var executionSession: AgentPlanExecutionSession? = null
+    private var pendingDocumentStepId: String? = null
+    private var activityInForeground = false
+    private val executionDocumentRequest = 4104
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -224,6 +232,29 @@ class MainActivity : Activity() {
             setTextIsSelectable(true)
         }
         root.addView(plannerOutput, fieldParams())
+        executionStatus = TextView(this).apply {
+            text = "پس از تولید طرح، هر مرحله با تأیید جداگانهٔ شما اجرا می‌شود."
+            textSize = 13f
+            setTextColor(Color.rgb(190, 205, 196))
+            setTextIsSelectable(true)
+        }
+        root.addView(executionStatus, fieldParams())
+        executionNextButton = Button(this).apply {
+            text = "بررسی و اجرای مرحلهٔ بعد"
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(19, 185, 129))
+            setTextColor(Color.BLACK)
+            visibility = ViewGroup.GONE
+            setOnClickListener { confirmNextPlanStep() }
+        }
+        root.addView(executionNextButton, buttonParams())
+        executionVerifyButton = Button(this).apply {
+            text = "نتیجه را بررسی کردم؛ تکمیل مرحله"
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(13, 33, 25))
+            setTextColor(Color.rgb(53, 214, 160))
+            visibility = ViewGroup.GONE
+            setOnClickListener { confirmDispatchedStepCompletion() }
+        }
+        root.addView(executionVerifyButton, buttonParams())
         root.addView(Button(this).apply {
             text = "Unpair locally"
             backgroundTintList = ColorStateList.valueOf(Color.rgb(74, 36, 31))
@@ -274,8 +305,11 @@ class MainActivity : Activity() {
             runOnUiThread {
                 plannerButton.isEnabled = true
                 result.onSuccess { plan ->
+                    executionSession = if (plan.steps.isNotEmpty()) AgentPlanExecutionSession(plan) else null
+                    pendingDocumentStepId = null
                     plannerOutput.text = AgentPlanPolicy.render(plan)
                     setStatus("طرح دریافت و اعتبارسنجی شد؛ هیچ مرحله‌ای اجرا نشده است.")
+                    updateExecutionUi()
                 }.onFailure { error ->
                     plannerOutput.text = "ساخت یا اعتبارسنجی طرح ناموفق بود: ${error.message ?: "خطای نامشخص"}"
                     setStatus("طرح نامعتبر یا سرویس آنلاین ناموفق بود.")
@@ -284,9 +318,235 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun confirmNextPlanStep() {
+        val session = executionSession ?: run {
+            setStatus("ابتدا یک طرح معتبر تولید کنید.")
+            return
+        }
+        val step = session.nextRunnableStep() ?: run {
+            updateExecutionUi()
+            return
+        }
+        val position = session.plan.steps.indexOfFirst { it.id == step.id } + 1
+        val detail = describePlanStep(step)
+        AlertDialog.Builder(this)
+            .setTitle("تأیید مرحلهٔ $position از ${session.plan.steps.size}")
+            .setMessage(
+                "$detail\n\nاین اقدام فقط پس از تأیید شما آغاز می‌شود. " +
+                    "برای بازکردن وب‌سایت، مقصد در مرورگر Android باز خواهد شد. " +
+                    "برای فایل، انتخاب‌گر رسمی Android نمایش داده می‌شود."
+            )
+            .setNegativeButton("انصراف", null)
+            .setPositiveButton("تأیید و ادامه") { _, _ -> runReviewedPlanStep(session, step) }
+            .show()
+    }
+
+    private fun runReviewedPlanStep(session: AgentPlanExecutionSession, step: AgentPlanStep) {
+        val actionId = session.actionIdFor(step.id)
+        val decision = AgentPlanExecutionPolicy.evaluate(
+            step,
+            PlanPolicyContext(
+                actionId = actionId,
+                appInForeground = activityInForeground,
+                ownerConfirmed = true
+            )
+        )
+        if (!decision.allowed) {
+            setStatus("سیاست مجوز اجرای این مرحله را نپذیرفت: ${decision.reason}")
+            updateExecutionUi()
+            return
+        }
+
+        runCatching {
+            when (step.operation) {
+                AgentOperation.OPEN_APP -> {
+                    session.markDispatched(step.id)
+                    launchAllowlisted(step.target ?: throw IllegalArgumentException("App alias is missing."))
+                    setStatus("درخواست بازکردن برنامه به Android سپرده شد؛ پس از بازگشت، نتیجه را بررسی کنید.")
+                }
+                AgentOperation.OPEN_URL -> {
+                    val target = step.target ?: throw IllegalArgumentException("HTTPS destination is missing.")
+                    session.markDispatched(step.id)
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(target)))
+                    setStatus("نشانی به مرورگر Android سپرده شد؛ پس از بازگشت، نتیجه را بررسی کنید.")
+                }
+                AgentOperation.READ_SELECTED_DOCUMENT -> {
+                    session.markWaitingForResource(step.id)
+                    pendingDocumentStepId = step.id
+                    setStatus("پس از انتخاب فایل، مجوز منبع بررسی و پیش‌نمایش محلی انجام می‌شود.")
+                    startActivityForResult(
+                        AndroidDocumentAccess.createOpenDocumentIntent(),
+                        executionDocumentRequest
+                    )
+                }
+                AgentOperation.SHOW_TEXT -> {
+                    plannerOutput.text = "متن تأییدشده برای نمایش:\n\n" + (step.text ?: "")
+                    session.markCompleted(step.id, detail = "متن در برنامه نمایش داده شد.")
+                    setStatus("مرحلهٔ نمایش متن تکمیل شد.")
+                }
+            }
+        }.onFailure { error ->
+            runCatching { session.markFailed(step.id, error.message ?: "Action failed.") }
+            setStatus("اجرای مرحله ناموفق بود؛ برای جلوگیری از اجرای تکراری، ادامهٔ طرح متوقف شد.")
+        }
+        updateExecutionUi()
+    }
+
+    private fun handlePlanDocumentResult(resultCode: Int, data: Intent?) {
+        val session = executionSession
+        val stepId = pendingDocumentStepId
+        pendingDocumentStepId = null
+        if (session == null || stepId == null) {
+            setStatus("جلسهٔ اجرای فایل دیگر فعال نیست؛ هیچ فایلی خوانده نشد.")
+            updateExecutionUi()
+            return
+        }
+        if (resultCode != RESULT_OK) {
+            session.markFailed(stepId, "Document selection was cancelled.")
+            setStatus("انتخاب فایل لغو شد؛ ادامهٔ طرح متوقف شد.")
+            updateExecutionUi()
+            return
+        }
+        val uri = data?.data
+        if (uri == null) {
+            session.markFailed(stepId, "The document picker returned no resource.")
+            setStatus("انتخاب‌گر فایلی برنگرداند؛ ادامهٔ طرح متوقف شد.")
+            updateExecutionUi()
+            return
+        }
+
+        val actionId = session.actionIdFor(stepId)
+        val decision = AgentPlanExecutionPolicy.evaluate(
+            session.plan.steps.first { it.id == stepId },
+            PlanPolicyContext(
+                actionId = actionId,
+                appInForeground = activityInForeground,
+                ownerConfirmed = true,
+                resourceSelected = true
+            )
+        )
+        if (!decision.allowed) {
+            session.markFailed(stepId, decision.reason)
+            setStatus("سیاست مجوز خواندن فایل انتخاب‌شده را نپذیرفت.")
+            updateExecutionUi()
+            return
+        }
+
+        val resultFlags = data.flags
+        setBusy("در حال بررسی مجوز و خواندن فایل انتخاب‌شده به‌صورت محلی…")
+        executor.execute {
+            val readResult = runCatching {
+                val preview = AndroidDocumentAccess.readTextPreview(contentResolver, uri)
+                val persisted = runCatching {
+                    AndroidDocumentAccess.persistReadPermission(contentResolver, uri, resultFlags)
+                }.getOrDefault(false)
+                preview to persisted
+            }
+            runOnUiThread {
+                readResult.onSuccess { (preview, persisted) ->
+                    documentPreview.text =
+                        "نوع فایل: ${preview.mimeType}\nحجم خوانده‌شده: ${preview.bytesRead} بایت\n" +
+                            "دسترسی پایدار: ${if (persisted) "بله" else "خیر؛ فقط دسترسی موقت انتخاب‌گر"}\n\n" +
+                            preview.text
+                    session.markCompleted(stepId, detail = "فایل انتخاب‌شده فقط روی دستگاه پیش‌نمایش شد.")
+                    setStatus("فایل به‌صورت محلی پیش‌نمایش شد و به Cloud ارسال نشد.")
+                }.onFailure { error ->
+                    session.markFailed(stepId, error.message ?: "Local document preview failed.")
+                    documentPreview.text = "پیش‌نمایش در دسترس نیست: ${error.message ?: "خطای نامشخص"}"
+                    setStatus("خواندن فایل ناموفق بود؛ ادامهٔ طرح متوقف شد.")
+                }
+                updateExecutionUi()
+            }
+        }
+    }
+
+    private fun confirmDispatchedStepCompletion() {
+        val session = executionSession ?: return
+        val record = session.records().firstOrNull { it.state == PlanStepState.DISPATCHED } ?: return
+        val step = session.plan.steps.first { it.id == record.stepId }
+        AlertDialog.Builder(this)
+            .setTitle("تأیید نتیجهٔ اقدام")
+            .setMessage(
+                "${describePlanStep(step)}\n\nآیا خودتان بررسی کرده‌اید که این مرحله با موفقیت انجام شده است؟ " +
+                    "تأیید شما فقط مرحلهٔ فعلی را تکمیل می‌کند."
+            )
+            .setNegativeButton("هنوز نه", null)
+            .setPositiveButton("بله، بررسی کردم") { _, _ ->
+                runCatching {
+                    session.markCompleted(step.id, ownerVerified = true, detail = "Owner verified after returning to the app.")
+                }.onSuccess {
+                    setStatus("تکمیل مرحله توسط شما تأیید شد.")
+                }.onFailure {
+                    setStatus("تأیید مرحله انجام نشد: ${it.message ?: "خطای نامشخص"}")
+                }
+                updateExecutionUi()
+            }
+            .show()
+    }
+
+    private fun describePlanStep(step: AgentPlanStep): String = when (step.operation) {
+        AgentOperation.OPEN_APP -> "بازکردن برنامهٔ مجاز: ${step.target}"
+        AgentOperation.OPEN_URL -> "بازکردن نشانی HTTPS:\n${step.target}"
+        AgentOperation.READ_SELECTED_DOCUMENT -> "بازکردن انتخاب‌گر رسمی Android برای انتخاب یک فایل متنی"
+        AgentOperation.SHOW_TEXT -> "نمایش متن:\n${step.text}"
+    }
+
+    private fun updateExecutionUi() {
+        if (!::executionStatus.isInitialized) return
+        val session = executionSession
+        if (session == null) {
+            executionStatus.text = "این طرح مرحلهٔ اجرایی ندارد یا هنوز طرحی تولید نشده است."
+            executionNextButton.visibility = ViewGroup.GONE
+            executionVerifyButton.visibility = ViewGroup.GONE
+            return
+        }
+
+        val lines = session.records().mapIndexed { index, record ->
+            val stateText = when (record.state) {
+                PlanStepState.PENDING -> "در انتظار"
+                PlanStepState.WAITING_FOR_RESOURCE -> "در انتظار انتخاب منبع"
+                PlanStepState.DISPATCHED -> "منتظر تأیید نتیجه توسط شما"
+                PlanStepState.COMPLETED -> "تکمیل‌شده"
+                PlanStepState.FAILED -> "ناموفق؛ ادامه متوقف است"
+            }
+            "${index + 1}. ${record.stepId}: $stateText"
+        }
+        executionStatus.text = lines.joinToString("\n")
+        if (session.isComplete()) {
+            executionStatus.append("\n\nتمام مراحل با تأیید لازم تکمیل شدند.")
+            executionNextButton.visibility = ViewGroup.GONE
+            executionVerifyButton.visibility = ViewGroup.GONE
+            return
+        }
+
+        val dispatched = session.records().any { it.state == PlanStepState.DISPATCHED }
+        if (dispatched) {
+            executionNextButton.visibility = ViewGroup.GONE
+            executionVerifyButton.visibility = ViewGroup.VISIBLE
+            executionVerifyButton.isEnabled = activityInForeground
+            return
+        }
+        executionVerifyButton.visibility = ViewGroup.GONE
+        val next = session.nextRunnableStep()
+        if (next != null && pendingDocumentStepId == null) {
+            executionNextButton.text = "تأیید و اجرای مرحلهٔ ${session.plan.steps.indexOfFirst { it.id == next.id } + 1}"
+            executionNextButton.visibility = ViewGroup.VISIBLE
+            executionNextButton.isEnabled = activityInForeground
+        } else {
+            executionNextButton.visibility = ViewGroup.GONE
+            if (session.records().any { it.state == PlanStepState.FAILED }) {
+                executionStatus.append("\n\nبرای جلوگیری از اجرای تکراری، این طرح متوقف شده است.")
+            }
+        }
+    }
+
     @Suppress("DEPRECATION")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == executionDocumentRequest) {
+            handlePlanDocumentResult(resultCode, data)
+            return
+        }
         if (requestCode != openDocumentRequest || resultCode != RESULT_OK) return
         val uri = data?.data ?: run {
             setStatus("فایلی انتخاب نشد.")
@@ -407,7 +667,15 @@ class MainActivity : Activity() {
         )
     }
 
+    override fun onResume() {
+        super.onResume()
+        activityInForeground = true
+        updateExecutionUi()
+    }
+
     override fun onPause() {
+        activityInForeground = false
+        updateExecutionUi()
         if (voiceActive) {
             voiceController.cancel()
             voiceActive = false
