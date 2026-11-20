@@ -9,7 +9,7 @@ A device-side companion for the MR_SIAVASH ecosystem. This first usable release 
 - Local API bound to 127.0.0.1 only; no LAN or public listener.
 - Random local bearer token and authenticated control endpoints.
 - Explicit screenshot capture saved locally.
-- Launch Notepad, Calculator, Explorer, or the default browser on a blank page.
+- Launch Notepad, Calculator, Explorer, the default browser on a blank page, or ChatGPT at its fixed official URL.
 - Schedule one of those app launches up to 30 days ahead.
 - List and cancel pending scheduled tasks.
 - CLI commands so everyday use does not require Swagger or custom scripts.
@@ -51,11 +51,12 @@ In a second PowerShell window, run commands from the repository directory:
     .\.venv\Scripts\el-agent.exe screenshot
     .\.venv\Scripts\el-agent.exe launch notepad
     .\.venv\Scripts\el-agent.exe launch calculator
+    .\.venv\Scripts\el-agent.exe launch chatgpt
     .\.venv\Scripts\el-agent.exe tasks
 
 Schedule an app launch using an ISO 8601 time that includes its UTC offset. Example:
 
-    .\.venv\Scripts\el-agent.exe schedule notepad --at "2026-11-20T14:00:00+04:00"
+    .\.venv\Scripts\el-agent.exe schedule chatgpt --at "2026-11-21T14:00:00+04:00"
 
 Cancel a pending task:
 
