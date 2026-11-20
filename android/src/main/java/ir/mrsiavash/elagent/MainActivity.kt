@@ -104,7 +104,7 @@ class MainActivity : Activity() {
                     intArrayOf(if (selected) Color.rgb(54, 135, 123) else Color.rgb(26, 34, 49),
                         if (selected) Color.rgb(37, 91, 92) else Color.rgb(20, 27, 40))
                 ).apply { cornerRadius = (10 * resources.displayMetrics.density) }
-                button.setTextColor(if (selected) Color.rgb(225, 246, 242) else Color.rgb(155, 170, 190)
+                button.setTextColor(if (selected) Color.rgb(225, 246, 242) else Color.rgb(155, 170, 190))
                 button.elevation = (if (selected) 2 else 0) * resources.displayMetrics.density
             }
         }
