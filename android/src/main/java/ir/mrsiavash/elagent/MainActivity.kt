@@ -177,7 +177,7 @@ class MainActivity : Activity() {
             setStatus("فایلی انتخاب نشد.")
             return
         }
-        val resultFlags = data.flags
+        val resultFlags = data?.flags ?: 0
         setBusy("در حال خواندن فایل انتخاب‌شده به‌صورت محلی…")
         executor.execute {
             val result = runCatching {
