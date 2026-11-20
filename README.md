@@ -16,7 +16,7 @@ A device-side companion for the MR_SIAVASH ecosystem. This release provides a lo
 - A deterministic Persian/English command parser for a small allowlist (e.g. «اسکرین‌شات بگیر» and «برو داخل چت جی پی تی»); unknown commands are rejected.
 - CLI commands so everyday use does not require Swagger or custom scripts.
 
-The Hub remains the future authority for identity, shared memory, remote scheduling, policy, and multi-device coordination. This repository owns the local Windows companion runtime.
+MR_SIAVASH_HUB_AI is the authority for device identity, scoped credentials, registry, revocation, and device health. The companion currently sends outbound heartbeat metadata only; Hub-issued remote task dispatch and shared memory are not enabled yet.
 
 ## Requirements
 
@@ -97,4 +97,4 @@ See docs/ROADMAP.md and docs/SECURITY.md. CI tests Windows and Linux with Python
 
 ## Status
 
-The Windows-first MVP is merged into main. The desktop control center and bounded Persian/English command grammar are implemented in the current development branch; they are not yet merged into main. Automated CI is required on Windows and Ubuntu with Python 3.11 and 3.12; a clean Windows 11 installation and live screenshot/application-launch acceptance test are still required before calling desktop behavior verified. The scheduled ChatGPT shortcut opens ChatGPT only; sending prompts or automating a conversation is not implemented. Android, browser extension, Hub pairing, shared memory, and cloud scheduling remain planned.
+Version 0.2.0 adds owner-initiated Hub pairing, rotating scoped device credentials, and an outbound heartbeat containing only device ID, agent version, runtime state, and uptime. A clean Windows 11 installation and live screenshot/application-launch acceptance test are still required before calling desktop behavior verified. The scheduled ChatGPT shortcut opens ChatGPT only; sending prompts or automating a conversation is not implemented. Remote task dispatch, shared memory, Android, browser extension, and cloud scheduling remain planned.
