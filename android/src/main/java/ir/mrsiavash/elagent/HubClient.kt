@@ -69,6 +69,9 @@ class HubClient(private val store: SecureStore) {
         require((0 until scopes.length()).all { scopes.optString(it).matches(Regex("[a-z_.]+")) }) {
             "Hub returned malformed device scopes."
         }
+        require((0 until scopes.length()).any { scopes.optString(it) == "device.heartbeat" }) {
+            "Hub pairing must grant device.heartbeat for this Android companion preview."
+        }
         val now = System.currentTimeMillis()
         val saved = store.read()
             .put("hub_url", hub)
