@@ -195,13 +195,7 @@ class MainActivity : Activity() {
         voiceActive = false
         voiceButton.text = "شروع فرمان صوتی (محلی)"
         setStatus("متن تشخیص‌داده‌شده: " + transcript)
-        val normalized = transcript.lowercase(java.util.Locale.ROOT)
-            .replace("ي", "ی").replace("ك", "ک").replace("‌", " ")
-        val alias = when {
-            normalized.contains("چت جی پی تی") || normalized.contains("chatgpt") || normalized.contains("chat gpt") -> "chatgpt"
-            normalized.contains("مرورگر") || normalized.contains("browser") -> "browser"
-            else -> null
-        }
+        val alias = VoiceIntentResolver.resolve(transcript)
         if (alias == null) {
             val message = "این فرمان در فهرست مجاز نیست؛ هیچ عملیاتی اجرا نشد."
             setStatus(message)
