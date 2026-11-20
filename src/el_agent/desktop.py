@@ -159,6 +159,9 @@ class DesktopControlCenter:
     def _append_chat(self, message: str):
         self.chat_output.configure(state="normal")
         self.chat_output.insert("end", message)
+        current = self.chat_output.get("1.0", "end-1c")
+        if len(current) > 100_000:
+            self.chat_output.delete("1.0", f"1.0 + {len(current) - 100_000} chars")
         self.chat_output.see("end")
         self.chat_output.configure(state="disabled")
 
