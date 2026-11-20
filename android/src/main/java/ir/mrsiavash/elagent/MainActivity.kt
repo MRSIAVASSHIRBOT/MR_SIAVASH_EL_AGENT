@@ -27,6 +27,7 @@ import java.util.concurrent.TimeUnit
 
 class MainActivity : Activity() {
     private val executor = Executors.newSingleThreadExecutor()
+    private val plannerExecutor = Executors.newSingleThreadExecutor()
     private lateinit var store: SecureStore
     private lateinit var status: TextView
     private lateinit var hubUrl: EditText
@@ -296,7 +297,7 @@ class MainActivity : Activity() {
         plannerButton.isEnabled = false
         plannerOutput.text = "در حال ساخت طرح ساختاریافته…"
         setStatus("درخواست متنی به مدل آنلاین ارسال شد.")
-        executor.execute {
+        plannerExecutor.execute {
             val result = runCatching {
                 val provider = OpenAiChatProvider(key, model)
                 val raw = provider.chatJson(
@@ -704,6 +705,7 @@ class MainActivity : Activity() {
     override fun onDestroy() {
         if (::voiceController.isInitialized) voiceController.close()
         executor.shutdown()
+        plannerExecutor.shutdown()
         super.onDestroy()
     }
 }
