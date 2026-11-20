@@ -5,6 +5,8 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -61,14 +63,14 @@ class MainActivity : Activity() {
         store = SecureStore(this)
         val shell = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.rgb(5, 16, 12))
+            setBackgroundColor(Color.rgb(10, 14, 22))
         }
         val pageHost = android.widget.FrameLayout(this)
         fun createPage(): Pair<ScrollView, LinearLayout> {
             val content = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(22, 28, 22, 28)
-                setBackgroundColor(Color.rgb(7, 22, 16))
+                setBackgroundColor(Color.rgb(13, 19, 30))
             }
             val page = ScrollView(this).apply {
                 isFillViewport = true
@@ -87,7 +89,7 @@ class MainActivity : Activity() {
         val navigation = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(8, 8, 8, 12)
-            setBackgroundColor(Color.rgb(8, 28, 20))
+            setBackgroundColor(Color.rgb(18, 25, 38))
         }
         val navigationButtons = mutableListOf<Button>()
         fun selectPage(index: Int) {
@@ -97,9 +99,9 @@ class MainActivity : Activity() {
             navigationButtons.forEachIndexed { buttonIndex, button ->
                 val selected = buttonIndex == index
                 button.backgroundTintList = ColorStateList.valueOf(
-                    if (selected) Color.rgb(20, 185, 129) else Color.rgb(13, 43, 30)
+                    if (selected) Color.rgb(62, 186, 154) else Color.rgb(35, 46, 63)
                 )
-                button.setTextColor(if (selected) Color.BLACK else Color.rgb(190, 220, 204))
+                button.setTextColor(if (selected) Color.BLACK else Color.rgb(190, 202, 220))
             }
         }
         listOf("خانه", "هوش مصنوعی", "ابزارها", "اتصال").forEachIndexed { index, label ->
@@ -125,59 +127,59 @@ class MainActivity : Activity() {
         homeContent.addView(TextView(this).apply {
             text = "دستیار شخصی هوشمند"
             textSize = 26f
-            setTextColor(Color.rgb(236, 250, 242))
+            setTextColor(Color.rgb(242, 246, 252))
         }, fieldParams())
         homeContent.addView(TextView(this).apply {
             text = "MR SIAVASH EL AGENT  ·  کنترل‌پنل Android"
             textSize = 13f
-            setTextColor(Color.rgb(88, 218, 165))
+            setTextColor(Color.rgb(95, 202, 176))
         }, fieldParams())
 
         root.addView(TextView(this).apply {
             text = "MR SIAVASH EL AGENT"
             textSize = 24f
-            setTextColor(Color.rgb(232, 245, 239))
+            setTextColor(Color.rgb(232, 238, 248))
         })
         root.addView(TextView(this).apply {
             text = "Android companion · v0.6.0"
             textSize = 14f
-            setTextColor(Color.rgb(168, 196, 183))
+            setTextColor(Color.rgb(161, 174, 195))
         })
         root.addView(TextView(this).apply {
             text = "Device ID: ${store.deviceId()}"
             textSize = 12f
-            setTextColor(Color.rgb(53, 214, 160))
+            setTextColor(Color.rgb(104, 196, 218))
             setTextIsSelectable(true)
         }, fieldParams())
         root = settingsContent
         root.addView(TextView(this).apply {
             text = "اتصال دستگاه و مخاطب سریع"
             textSize = 19f
-            setTextColor(Color.rgb(88, 218, 165))
+            setTextColor(Color.rgb(95, 202, 176))
         }, fieldParams())
         root.addView(Button(this).apply {
             text = "انتخاب مخاطب پدر از مخاطبین گوشی"
             isAllCaps = false
-            backgroundTintList = ColorStateList.valueOf(Color.rgb(15, 65, 43))
-            setTextColor(Color.rgb(225, 248, 235))
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(37, 52, 72))
+            setTextColor(Color.rgb(232, 242, 250))
             setOnClickListener { chooseFatherContact() }
         }, buttonParams())
         fatherContactStatus = TextView(this).apply {
             text = fatherContactSummary()
             textSize = 13f
-            setTextColor(Color.rgb(190, 215, 199))
+            setTextColor(Color.rgb(188, 200, 216))
         }
         root.addView(fatherContactStatus, fieldParams())
         hubUrl = EditText(this).apply {
             hint = "Hub HTTPS address (https://...)"
             setTextColor(Color.WHITE)
-            setHintTextColor(Color.rgb(145, 170, 158))
+            setHintTextColor(Color.rgb(142, 158, 180))
             setSingleLine(true)
         }
         pairingCode = EditText(this).apply {
             hint = "One-time pairing code"
             setTextColor(Color.WHITE)
-            setHintTextColor(Color.rgb(145, 170, 158))
+            setHintTextColor(Color.rgb(142, 158, 180))
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
             setSingleLine(true)
         }
@@ -185,7 +187,7 @@ class MainActivity : Activity() {
         root.addView(pairingCode, fieldParams())
         root.addView(Button(this).apply {
             text = "Pair with Hub"
-            backgroundTintList = ColorStateList.valueOf(Color.rgb(19, 185, 129))
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(62, 186, 154))
             setTextColor(Color.BLACK)
             setOnClickListener {
                 val url = hubUrl.text.toString()
@@ -200,7 +202,7 @@ class MainActivity : Activity() {
         }, buttonParams())
         root.addView(Button(this).apply {
             text = "Send heartbeat now"
-            backgroundTintList = ColorStateList.valueOf(Color.rgb(19, 185, 129))
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(62, 186, 154))
             setTextColor(Color.BLACK)
             setOnClickListener {
                 setBusy("Contacting Hub…")
@@ -217,7 +219,7 @@ class MainActivity : Activity() {
             textSize = 18f
             isAllCaps = false
             minHeight = 72
-            backgroundTintList = ColorStateList.valueOf(Color.rgb(19, 185, 129))
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(62, 186, 154))
             setTextColor(Color.BLACK)
             setOnClickListener { toggleVoice() }
         }
@@ -226,34 +228,34 @@ class MainActivity : Activity() {
             text = "📞  تماس سریع با پدر"
             textSize = 15f
             isAllCaps = false
-            backgroundTintList = ColorStateList.valueOf(Color.rgb(13, 43, 30))
-            setTextColor(Color.rgb(88, 218, 165))
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(35, 46, 63))
+            setTextColor(Color.rgb(95, 202, 176))
             setOnClickListener { placeFatherCall() }
         }, buttonParams())
         root.addView(TextView(this).apply {
             text = "برای فرمان صوتی، دکمه را بزن و بعد از شنیدن صدای آماده‌باش صحبت کن. تشخیص گفتار فعلاً با موتور آفلاین Android انجام می‌شود."
             textSize = 12f
-            setTextColor(Color.rgb(176, 204, 188))
+            setTextColor(Color.rgb(172, 186, 202))
         }, fieldParams())
         root = toolsContent
         root.addView(TextView(this).apply {
             text = "ابزارهای دستگاه"
             textSize = 21f
-            setTextColor(Color.rgb(88, 218, 165))
+            setTextColor(Color.rgb(95, 202, 176))
         }, fieldParams())
         root.addView(Button(this).apply {
             text = "مدیریت مدل‌های آفلاین · Whisper و LLM"
             isAllCaps = false
-            backgroundTintList = ColorStateList.valueOf(Color.rgb(15, 65, 43))
-            setTextColor(Color.rgb(225, 248, 235))
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(37, 52, 72))
+            setTextColor(Color.rgb(232, 242, 250))
             setOnClickListener {
                 startActivity(Intent(this@MainActivity, OfflineModelsActivity::class.java))
             }
         }, buttonParams())
         root.addView(Button(this).apply {
             text = "Open ChatGPT"
-            backgroundTintList = ColorStateList.valueOf(Color.rgb(13, 33, 25))
-            setTextColor(Color.rgb(53, 214, 160))
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(27, 35, 50))
+            setTextColor(Color.rgb(104, 196, 218))
             setOnClickListener {
                 runCatching { launchAllowlisted("chatgpt") }
                     .onFailure { setStatus(it.message ?: "Could not open ChatGPT.") }
@@ -261,8 +263,8 @@ class MainActivity : Activity() {
         }, buttonParams())
         root.addView(Button(this).apply {
             text = "Open browser"
-            backgroundTintList = ColorStateList.valueOf(Color.rgb(13, 33, 25))
-            setTextColor(Color.rgb(53, 214, 160))
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(27, 35, 50))
+            setTextColor(Color.rgb(104, 196, 218))
             setOnClickListener {
                 runCatching { launchAllowlisted("browser") }
                     .onFailure { setStatus(it.message ?: "Could not open browser.") }
@@ -270,8 +272,8 @@ class MainActivity : Activity() {
         }, buttonParams())
         root.addView(Button(this).apply {
             text = "انتخاب و پیش‌نمایش فایل متنی"
-            backgroundTintList = ColorStateList.valueOf(Color.rgb(13, 33, 25))
-            setTextColor(Color.rgb(53, 214, 160))
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(27, 35, 50))
+            setTextColor(Color.rgb(104, 196, 218))
             setOnClickListener {
                 runCatching {
                     startActivityForResult(AndroidDocumentAccess.createOpenDocumentIntent(), openDocumentRequest)
@@ -281,7 +283,7 @@ class MainActivity : Activity() {
         documentPreview = TextView(this).apply {
             text = "فایل فقط پس از انتخاب مستقیم شما خوانده می‌شود. پیش‌نمایش متنی حداکثر ۶۴ کیلوبایت است و به Cloud ارسال نمی‌شود."
             textSize = 13f
-            setTextColor(Color.rgb(210, 226, 217))
+            setTextColor(Color.rgb(214, 225, 238))
             setTextIsSelectable(true)
         }
         root.addView(documentPreview, fieldParams())
@@ -289,46 +291,46 @@ class MainActivity : Activity() {
         root.addView(TextView(this).apply {
             text = "هوش مصنوعی و برنامه‌ریز"
             textSize = 21f
-            setTextColor(Color.rgb(88, 218, 165))
+            setTextColor(Color.rgb(95, 202, 176))
         }, fieldParams())
         root.addView(TextView(this).apply {
             text = "برنامه‌ریز هوشمند · تبدیل درخواست به مراحل ساختاریافته"
             textSize = 17f
-            setTextColor(Color.rgb(53, 214, 160))
+            setTextColor(Color.rgb(104, 196, 218))
         }, fieldParams())
         root.addView(TextView(this).apply {
             text = "ارائه‌دهنده‌های رایگان · Gemini سپس OpenRouter"
             textSize = 14f
-            setTextColor(Color.rgb(232, 245, 239))
+            setTextColor(Color.rgb(232, 238, 248))
         }, fieldParams())
         root.addView(TextView(this).apply {
             text = "کلید هر سرویس اختیاری است و فقط در محفظهٔ رمزگذاری‌شدهٔ Android ذخیره می‌شود. برنامه فقط بین مسیرهای رایگان جابه‌جا می‌شود و هیچ مسیر پولی یا ارتقای خودکاری ندارد. در صورت خطا، متن درخواست ممکن است برای سرویس بعدی هم ارسال شود؛ اطلاعات حساس وارد نکنید. رایگان‌بودن Gemini به Tier پروژه بستگی دارد؛ برنامه وضعیت Billing حساب را نمی‌تواند تشخیص دهد. برای تضمین هزینهٔ صفر، پروژهٔ Gemini باید Free Tier و بدون Billing فعال باشد."
             textSize = 12f
-            setTextColor(Color.rgb(190, 205, 196))
+            setTextColor(Color.rgb(185, 198, 216))
         }, fieldParams())
         addFreeProviderKeyEditor(root, "gemini", "Google Gemini")
         addFreeProviderKeyEditor(root, "openrouter", "OpenRouter")
         root.addView(TextView(this).apply {
             text = "مدل‌های پیش‌فرض: gemini-4-hydrogen · openrouter/free. کلید قدیمی OpenAI حذف نمی‌شود، اما برنامه‌ریز رایگان از آن استفاده نمی‌کند."
             textSize = 12f
-            setTextColor(Color.rgb(190, 205, 196))
+            setTextColor(Color.rgb(185, 198, 216))
         }, fieldParams())
         root.addView(TextView(this).apply {
             text = "فقط درخواست متنی واردشده به برنامه‌ریز ارسال می‌شود؛ فایل، تصویر، صدای میکروفون، اسکرین‌شات و حافظهٔ محلی ارسال نمی‌شوند. طرح خروجی پیش از نمایش، محلی اعتبارسنجی می‌شود."
             textSize = 12f
-            setTextColor(Color.rgb(190, 205, 196))
+            setTextColor(Color.rgb(185, 198, 216))
         }, fieldParams())
         plannerRequest = EditText(this).apply {
             hint = "درخواستت را بنویس؛ مثلاً: مرورگر را باز کن و این صفحه را نمایش بده."
             setTextColor(Color.WHITE)
-            setHintTextColor(Color.rgb(145, 170, 158))
+            setHintTextColor(Color.rgb(142, 158, 180))
             minLines = 3
             maxLines = 5
         }
         root.addView(plannerRequest, fieldParams())
         plannerButton = Button(this).apply {
             text = "ساخت برنامهٔ اجرایی (بدون اجرا)"
-            backgroundTintList = ColorStateList.valueOf(Color.rgb(19, 185, 129))
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(62, 186, 154))
             setTextColor(Color.BLACK)
             setOnClickListener { generatePlan() }
         }
@@ -336,20 +338,20 @@ class MainActivity : Activity() {
         plannerOutput = TextView(this).apply {
             text = "طرح ساخته‌شده اینجا نمایش داده می‌شود. هیچ مرحله‌ای صرفاً با تولید طرح اجرا نخواهد شد."
             textSize = 14f
-            setTextColor(Color.rgb(232, 245, 239))
+            setTextColor(Color.rgb(232, 238, 248))
             setTextIsSelectable(true)
         }
         root.addView(plannerOutput, fieldParams())
         executionStatus = TextView(this).apply {
             text = "پس از تولید طرح، هر مرحله با تأیید جداگانهٔ شما اجرا می‌شود."
             textSize = 13f
-            setTextColor(Color.rgb(190, 205, 196))
+            setTextColor(Color.rgb(185, 198, 216))
             setTextIsSelectable(true)
         }
         root.addView(executionStatus, fieldParams())
         executionNextButton = Button(this).apply {
             text = "بررسی و اجرای مرحلهٔ بعد"
-            backgroundTintList = ColorStateList.valueOf(Color.rgb(19, 185, 129))
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(62, 186, 154))
             setTextColor(Color.BLACK)
             visibility = ViewGroup.GONE
             setOnClickListener { confirmNextPlanStep() }
@@ -357,8 +359,8 @@ class MainActivity : Activity() {
         root.addView(executionNextButton, buttonParams())
         executionVerifyButton = Button(this).apply {
             text = "نتیجه را بررسی کردم؛ تکمیل مرحله"
-            backgroundTintList = ColorStateList.valueOf(Color.rgb(13, 33, 25))
-            setTextColor(Color.rgb(53, 214, 160))
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(27, 35, 50))
+            setTextColor(Color.rgb(104, 196, 218))
             visibility = ViewGroup.GONE
             setOnClickListener { confirmDispatchedStepCompletion() }
         }
@@ -367,12 +369,12 @@ class MainActivity : Activity() {
         root.addView(TextView(this).apply {
             text = "اتصال به MR_SIAVASH_HUB_AI"
             textSize = 19f
-            setTextColor(Color.rgb(88, 218, 165))
+            setTextColor(Color.rgb(95, 202, 176))
         }, fieldParams())
         root.addView(Button(this).apply {
             text = "Unpair locally"
-            backgroundTintList = ColorStateList.valueOf(Color.rgb(74, 36, 31))
-            setTextColor(Color.rgb(255, 220, 210))
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(69, 38, 48))
+            setTextColor(Color.rgb(255, 224, 231))
             setOnClickListener {
                 store.clearCredentialsPreservingIdentity()
                 WorkManager.getInstance(this@MainActivity).cancelUniqueWork("el-agent-heartbeat")
@@ -383,9 +385,9 @@ class MainActivity : Activity() {
         status = TextView(this).apply {
             text = "آماده‌به‌کار · منتظر فرمان شما"
             textSize = 14f
-            setTextColor(Color.rgb(168, 196, 183))
+            setTextColor(Color.rgb(161, 174, 195))
             setPadding(16, 18, 16, 18)
-            setBackgroundColor(Color.rgb(12, 39, 27))
+            setBackgroundColor(Color.rgb(23, 32, 47))
         }
         root.addView(status, fieldParams())
         voiceController = LocalVoiceController(this, ::setStatus, ::handleVoiceTranscript, ::finishVoiceUi)
@@ -393,10 +395,69 @@ class MainActivity : Activity() {
             setStatus("Paired with Hub. Periodic heartbeat is scheduled.")
             scheduleHeartbeat()
         }
+        applyVisualRefresh(shell)
+        selectPage(0)
     }
 
+    private fun applyVisualRefresh(root: android.view.ViewGroup) {
+        val scale = resources.displayMetrics.density
+        fun dp(value: Int) = (value * scale).toInt()
+        fun walk(group: android.view.ViewGroup) {
+            for (i in 0 until group.childCount) {
+                val view = group.getChildAt(i)
+                when (view) {
+                    is Button -> {
+                        val label = view.text?.toString().orEmpty()
+                        val isPrimary = label.contains("🎙") || label.contains("ساخت برنامه") ||
+                            label.contains("تأیید و اجرای") || label.contains("اجرا") ||
+                            label.contains("ذخیره امن") || label.contains("Pair with Hub")
+                        val isDanger = label.contains("حذف کلید") || label.contains("Unpair")
+                        val top = when {
+                            isDanger -> Color.rgb(100, 43, 54)
+                            isPrimary -> Color.rgb(61, 177, 149)
+                            else -> Color.rgb(32, 42, 59)
+                        }
+                        val bottom = when {
+                            isDanger -> Color.rgb(65, 34, 46)
+                            isPrimary -> Color.rgb(38, 132, 125)
+                            else -> Color.rgb(24, 31, 45)
+                        }
+                        view.background = GradientDrawable(
+                            GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(top, bottom)
+                        ).apply { cornerRadius = dp(18).toFloat() }
+                        view.setTextColor(if (isPrimary) Color.rgb(8, 20, 24) else Color.rgb(229, 237, 248))
+                        view.isAllCaps = false
+                        view.textSize = if (label.contains("🎙")) 16f else 14f
+                        view.typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                        view.minimumHeight = dp(if (label.contains("🎙")) 64 else 52)
+                        view.setPadding(dp(16), dp(12), dp(16), dp(12))
+                        view.elevation = dp(2).toFloat()
+                    }
+                    is EditText -> {
+                        view.background = GradientDrawable().apply {
+                            setColor(Color.rgb(22, 29, 43))
+                            cornerRadius = dp(14).toFloat()
+                            setStroke(dp(1), Color.rgb(48, 61, 81))
+                        }
+                        view.setPadding(dp(14), dp(12), dp(14), dp(12))
+                        view.textSize = 15f
+                        view.typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+                    }
+                    is TextView -> {
+                        view.typeface = Typeface.create(
+                            if (view.textSize / scale >= 19) "sans-serif-medium" else "sans-serif",
+                            Typeface.NORMAL
+                        )
+                        view.letterSpacing = if (view.textSize / scale >= 19) 0.01f else 0f
+                    }
+                    is android.view.ViewGroup -> walk(view)
+                }
+            }
+        }
+        walk(root)
+    }
 
-    private fun generatePlan() {
+    private fun generatePlan {
         val requestText = plannerRequest.text.toString()
         if (requestText.isBlank() || requestText.length > 4_000) {
             setStatus("درخواست باید بین ۱ تا ۴۰۰۰ نویسه باشد.")
@@ -905,7 +966,7 @@ class MainActivity : Activity() {
             hint = "کلید API · " + providerLabel
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
             setTextColor(Color.WHITE)
-            setHintTextColor(Color.rgb(145, 170, 158))
+            setHintTextColor(Color.rgb(142, 158, 180))
             setSingleLine(true)
         }
         root.addView(field, fieldParams())
