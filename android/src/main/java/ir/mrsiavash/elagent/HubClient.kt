@@ -157,33 +157,40 @@ class HubClient(private val store: SecureStore) {
         val app = if (task.isNull("app")) null else task.optString("app")
         val timeout = task.optLong("timeout_seconds", -1)
         val lease = response.optString("lease_token")
-        require(
-            runCatching { java.util.UUID.fromString(taskId).toString() == taskId }.getOrDefault(false) &&
-            action == "app.launch" && requiredScope == "app.launch"
-        ) {
-            "Hub returned an unsupported Android task contract."
+
+        require(runCatching { java.util.UUID.fromString(taskId).toString() == taskId }.getOrDefault(false)) {
+            "Hub returned a non-canonical Android task identifier."
         }
-        require(
-            "app.launch" in grantedScopes && app != null &&
-            app in setOf("chatgpt", "browser", "notepad", "calculator", "explorer")
-        ) {
-            "Task action is not supported by the Android companion."
-        }
+        require(requiredScope.isNotBlank()) { "Hub omitted the task's required scope." }
+
         val leaseExpiresAt = runCatching { Instant.parse(response.optString("lease_expires_at")) }
             .getOrElse { throw IllegalStateException("Hub returned an invalid lease expiry.", it) }
         val remainingLeaseSeconds = leaseExpiresAt.epochSecond - Instant.now().epochSecond
         require(
             timeout in 5L..60L &&
             lease.length in 40..128 &&
-            remainingLeaseSeconds in 1L..60L &&
-            app != null && app in setOf("chatgpt", "browser", "notepad", "calculator", "explorer")
+            remainingLeaseSeconds in 1L..60L
         ) {
-            "Hub returned an invalid task lease, timeout, or application alias."
+            "Hub returned an invalid task lease or timeout."
         }
-        return AndroidDeviceTaskClaim(
+
+        val claim = AndroidDeviceTaskClaim(
             taskId, action, app, task.optBoolean("owner_confirmed", false),
             timeout, lease, leaseExpiresAt
         )
+        if (!AndroidTaskPolicy.canLaunch(action, requiredScope, app, grantedScopes)) {
+            // A device can be offered a valid Hub task that this Android
+            // platform preview cannot perform. Report a bounded failure so
+            // the one-shot claim does not sit leased until expiry.
+            completeTask(
+                claim,
+                succeeded = false,
+                errorCode = AndroidTaskPolicy.denialCode(requiredScope, grantedScopes),
+                durationMs = 0L
+            )
+            return null
+        }
+        return claim
     }
 
     fun completeTask(
@@ -192,6 +199,9 @@ class HubClient(private val store: SecureStore) {
         errorCode: String?,
         durationMs: Long
     ) {
+        require(Instant.now().isBefore(claim.leaseExpiresAt)) {
+            "Hub task lease expired before the outcome could be reported."
+        }
         val saved = refreshIfNeeded()
         val payload = JSONObject()
             .put("lease_token", claim.leaseToken)
