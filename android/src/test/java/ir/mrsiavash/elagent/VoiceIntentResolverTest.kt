@@ -27,6 +27,8 @@ class VoiceIntentResolverTest {
     @Test fun rejectsUnknownAndAmbiguousCommands() {
         assertEquals(null, VoiceIntentResolver.resolve("برنامه تنظیمات را باز کن"))
         assertEquals(null, VoiceIntentResolver.resolve("ChatGPT and browser"))
+        assertEquals(null, VoiceIntentResolver.resolve("من ChatGPT را دوست دارم"))
+        assertEquals(null, VoiceIntentResolver.resolve("browser is useful"))
         assertEquals(null, VoiceIntentResolver.resolve("   "))
     }
 }
