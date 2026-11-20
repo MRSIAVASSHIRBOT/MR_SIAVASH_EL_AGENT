@@ -7,6 +7,9 @@ package ir.mrsiavash.elagent
 internal object AndroidTaskPolicy {
     val supportedAppAliases = setOf("chatgpt", "browser")
 
+    fun belongsToDevice(taskDeviceId: String?, localDeviceId: String): Boolean =
+        taskDeviceId != null && taskDeviceId == localDeviceId
+
     fun canLaunch(
         action: String,
         requiredScope: String,
