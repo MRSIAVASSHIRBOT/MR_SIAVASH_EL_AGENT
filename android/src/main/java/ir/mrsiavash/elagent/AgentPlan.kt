@@ -58,7 +58,10 @@ object AgentPlanParser {
             throw IllegalArgumentException("Model response is not valid JSON.")
         }
         requireOnlyKeys(root, rootKeys, setOf("schema_version", "summary", "steps"))
-        require(root.getInt("schema_version") == 1) { "Unsupported plan schema version." }
+        val schemaVersion = root.get("schema_version")
+        require(schemaVersion is Number && schemaVersion.toInt() == 1 && schemaVersion.toDouble() == 1.0) {
+            "Unsupported plan schema version."
+        }
 
         val summary = root.getString("summary").trim()
         require(summary.isNotEmpty() && summary.length <= MAX_SUMMARY_CHARS) {
@@ -125,7 +128,7 @@ object AgentPlanParser {
     ): AgentPlanStep {
         when (operation) {
             AgentOperation.OPEN_APP -> {
-                require(target in setOf("chatgpt", "browser")) { "Only the fixed ChatGPT and browser aliases are supported." }
+                require(target != null && target in setOf("chatgpt", "browser")) { "Only the fixed ChatGPT and browser aliases are supported." }
                 require(text == null) { "open_app does not accept text." }
             }
             AgentOperation.OPEN_URL -> {
