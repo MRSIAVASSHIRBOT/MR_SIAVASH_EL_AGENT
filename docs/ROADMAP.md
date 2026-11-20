@@ -21,7 +21,7 @@
 - [ ] Shared memory through Hub APIs only
 
 ## Platform expansion
-- [x] Android native pairing, encrypted credentials, heartbeat, and local allowlisted app launch preview (implementation in PR #6; Android CI passed; physical-device acceptance pending)
+- [ ] Android native pairing, encrypted credentials, heartbeat, and local allowlisted app launch preview (implementation in PR #6; Android CI passed; physical-device acceptance pending)
 - [ ] Android remote task dispatch after Hub task API release
 - [ ] Android explicit-consent screen capture and notification-based scheduling
 - [ ] Browser extension with explicit host permissions
