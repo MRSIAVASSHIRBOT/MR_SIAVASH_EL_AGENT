@@ -43,3 +43,11 @@ def test_chatgpt_is_an_explicitly_allowlisted_schedule_target(tmp_path):
     response=c.post("/v1/tasks",headers=h,json={"action":"launch_app","app_alias":"chatgpt","run_at":future})
     assert response.status_code==201
     assert response.json()["app_alias"]=="chatgpt"
+
+def test_device_advertises_fixed_chatgpt_alias_and_local_capabilities(tmp_path):
+    c=client(tmp_path); h={"Authorization":f"Bearer {TOKEN}"}
+    response=c.get("/v1/device",headers=h)
+    assert response.status_code==200
+    body=response.json()
+    assert "chatgpt" in body["supported_apps"]
+    assert body["remote_access"] is False
