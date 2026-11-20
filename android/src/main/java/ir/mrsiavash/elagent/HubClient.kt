@@ -33,7 +33,7 @@ class HubClient(private val store: SecureStore) {
         require(uri.userInfo == null && uri.query == null && uri.fragment == null && uri.path in listOf("", "/")) {
             "Enter only the Hub origin, without credentials or API paths."
         }
-        return "https://${uri.rawAuthority}"
+        return "https://" + uri.rawAuthority
     }
 
     private fun request(base: String, path: String, payload: JSONObject, token: String? = null, deviceId: String? = null): JSONObject {
@@ -49,7 +49,8 @@ class HubClient(private val store: SecureStore) {
         }
     }
 
-    fun pair(hubInput: String, pairingCode: String): String {
+    fun pair(hubInput: String, pairingCodeInput: String): String {
+        val pairingCode = pairingCodeInput.trim()
         require(pairingCode.length in 40..128) { "Pairing code format is invalid." }
         val hub = canonicalHubUrl(hubInput)
         val id = store.deviceId()
@@ -69,11 +70,8 @@ class HubClient(private val store: SecureStore) {
             "Hub returned invalid credential lifetimes."
         }
         val scopes = result.optJSONArray("scopes") ?: throw IllegalStateException("Hub omitted granted scopes.")
-        require((0 until scopes.length()).all { scopes.optString(it).matches(Regex("[a-z_.]+")) }) {
-            "Hub returned malformed device scopes."
-        }
-        require((0 until scopes.length()).any { scopes.optString(it) == "device.heartbeat" }) {
-            "Hub pairing must grant device.heartbeat for this Android companion preview."
+        require(scopes.length() == 1 && scopes.optString(0) == "device.heartbeat") {
+            "This Android preview accepts only the device.heartbeat scope. Create a new pairing challenge with that single scope."
         }
         val now = System.currentTimeMillis()
         val saved = store.read()
@@ -85,7 +83,7 @@ class HubClient(private val store: SecureStore) {
             .put("refresh_expires_at", now + refreshTtl * 1000L)
             .put("scopes", scopes)
         store.write(saved)
-        return "Paired successfully. Granted scopes: " + (0 until scopes.length()).joinToString { scopes.getString(it) }
+        return "Paired successfully. Granted scopes: device.heartbeat"
     }
 
     fun refreshIfNeeded(): JSONObject = synchronized(credentialLock) {
