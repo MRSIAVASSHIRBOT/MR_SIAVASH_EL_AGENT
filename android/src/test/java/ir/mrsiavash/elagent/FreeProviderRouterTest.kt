@@ -23,11 +23,11 @@ class FreeProviderRouterTest {
             FreeProviderId.GEMINI,
             failure = ProviderRequestException(FreeProviderId.GEMINI, ProviderFailureKind.RATE_LIMIT, "limited", 12)
         )
-        val next = FakeProvider(FreeProviderId.OPENROUTER, result = """{"steps":[]}""")
+        val next = FakeProvider(FreeProviderId.OPENROUTER, result = """{"schema_version":1,"summary":"ok","steps":[{"id":"open","operation":"open_app","depends_on":[],"target":"browser","text":null}],"clarification":null}""")
         val result = FreeProviderPlanRouter(providersOverride = listOf(limited, next))
             .generate("system", "user")
         assertEquals(FreeProviderId.OPENROUTER, result.provider)
-        assertEquals("""{"steps":[]}""", result.json)
+        assertTrue(result.json.contains("\"schema_version\":1"))
         assertEquals(1, limited.calls)
         assertEquals(1, next.calls)
     }
@@ -37,7 +37,7 @@ class FreeProviderRouterTest {
             FreeProviderId.GEMINI,
             failure = ProviderRequestException(FreeProviderId.GEMINI, ProviderFailureKind.RATE_LIMIT, "limited")
         )
-        val fallback = FakeProvider(FreeProviderId.OPENROUTER, result = "{}")
+        val fallback = FakeProvider(FreeProviderId.OPENROUTER, result = """{"schema_version":1,"summary":"ok","steps":[{"id":"open","operation":"open_app","depends_on":[],"target":"browser","text":null}],"clarification":null}""")
         FreeProviderPlanRouter(providersOverride = listOf(failed, fallback)).generate("system", "user")
         assertEquals(1, failed.calls)
     }
