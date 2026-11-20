@@ -36,7 +36,7 @@ async def scheduler_loop(store: TaskStore) -> None:
 
 async def hub_heartbeat_loop() -> None:
     """Synchronize only minimal device health metadata with the paired Hub."""
-    from el_agent.hub import HubClientError, heartbeat_once
+    from el_agent.hub import HEARTBEAT_INTERVAL_SECONDS, HubClientError, heartbeat_once
 
     while True:
         try:
@@ -45,4 +45,4 @@ async def hub_heartbeat_loop() -> None:
             logger.warning("Hub heartbeat unavailable: %s", exc)
         except Exception:
             logger.exception("Unexpected Hub heartbeat failure")
-        await asyncio.sleep(60)
+        await asyncio.sleep(HEARTBEAT_INTERVAL_SECONDS)
