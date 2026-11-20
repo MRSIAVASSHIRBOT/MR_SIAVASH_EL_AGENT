@@ -63,6 +63,10 @@ def pairing_challenge_payload() -> dict[str, object]:
 
 def validate_hub_url(value: str) -> str:
     parsed = urlsplit(value.strip())
+    try:
+        parsed.port
+    except ValueError as exc:
+        raise ValueError("Hub URL contains an invalid port.") from exc
     if not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
         raise ValueError("Hub URL must contain a hostname and no credentials, query, or fragment.")
     local_hosts = {"localhost", "127.0.0.1", "::1"}
@@ -224,6 +228,8 @@ def heartbeat_once() -> dict[str, object]:
         refresh_expiry = datetime.fromisoformat(str(credentials["refresh_expires_at"]))
     except ValueError as exc:
         raise HubClientError("Local Hub credential expiry metadata is invalid.") from exc
+    if access_expiry.tzinfo is None or refresh_expiry.tzinfo is None:
+        raise HubClientError("Local Hub credential expiry metadata must include a timezone.")
     if refresh_expiry <= now:
         raise HubClientError("Hub refresh credential expired; owner-initiated re-pairing is required.")
     if access_expiry <= now + timedelta(seconds=HEARTBEAT_REFRESH_WINDOW_SECONDS):
@@ -267,6 +273,6 @@ def unpair_local() -> dict[str, object]:
         path.unlink()
     return {
         "paired": False,
-        "device_id": credentials["device_id"] if credentials else get_device_id(),
+        "device_id": credentials["device_id"] if credentials else (device_id_path().read_text(encoding="utf-8").strip() if device_id_path().exists() else None),
         "remote_revocation_required": credentials is not None,
     }
