@@ -85,7 +85,10 @@ def _keyring_module():
         import keyring
     except ImportError as exc:
         raise ProviderError("Cloud key storage is unavailable. Install the optional cloud dependencies.") from exc
-    backend = keyring.get_keyring()
+    try:
+        backend = keyring.get_keyring()
+    except Exception as exc:
+        raise ProviderError("The OS credential store is unavailable.") from exc
     module = type(backend).__module__
     allowed = {
         "Windows": ("keyring.backends.Windows",),
@@ -100,7 +103,12 @@ def _keyring_module():
 def set_cloud_api_key(value: str) -> None:
     if not isinstance(value, str) or not 20 <= len(value) <= 512 or any(ch.isspace() for ch in value):
         raise ValueError("API key format is invalid.")
-    _keyring_module().set_password(KEYRING_SERVICE, KEYRING_USERNAME, value)
+    try:
+        _keyring_module().set_password(KEYRING_SERVICE, KEYRING_USERNAME, value)
+    except ProviderError:
+        raise
+    except Exception as exc:
+        raise ProviderError("The OS credential store could not save the cloud key.") from exc
 
 
 def clear_cloud_api_key() -> bool:
@@ -123,7 +131,7 @@ def cloud_key_configured() -> bool:
 class OllamaChatProvider:
     """Local Ollama provider restricted to the loopback interface."""
 
-    def __init__(self, model: str | None = None, timeout: int = 45):
+    def __init__(self, model: str | None = None, timeout: int = 180):
         self.model = model or os.environ.get("EL_AGENT_OLLAMA_MODEL", "llama3.1:8b")
         self.timeout = timeout
 
@@ -133,7 +141,7 @@ class OllamaChatProvider:
             "model": self.model,
             "messages": [{"role": "user", "content": prompt}],
             "stream": False,
-            "options": {"num_predict": 512},
+            "options": {"num_predict": 256},
         }, {}, self.timeout)
         message = data.get("message")
         content = message.get("content") if isinstance(message, dict) else None
@@ -154,7 +162,10 @@ class OpenAIChatProvider:
         if not self.model:
             raise ProviderError("Set EL_AGENT_CLOUD_MODEL before using the online provider.")
         keyring = _keyring_module()
-        api_key = keyring.get_password(KEYRING_SERVICE, KEYRING_USERNAME)
+        try:
+            api_key = keyring.get_password(KEYRING_SERVICE, KEYRING_USERNAME)
+        except Exception as exc:
+            raise ProviderError("The OS credential store could not read the cloud key.") from exc
         if not api_key:
             raise ProviderError("No cloud API key is configured. Use 'el-agent provider-key set'.")
         started = time.monotonic()
