@@ -12,6 +12,10 @@ APP_ALLOWLIST = {"notepad": ("notepad.exe",), "calculator": ("calc.exe",), "expl
 def launch_app(alias: str) -> dict:
     if platform.system() != "Windows":
         raise RuntimeError("Application launch is supported only on Windows.")
+    if alias == "chatgpt":
+        if not webbrowser.open("https://chatgpt.com/", new=2):
+            raise RuntimeError("ChatGPT could not be opened in the default browser.")
+        return {"alias": alias, "started": True, "detail": "Opened ChatGPT in the default browser."}
     if alias == "browser":
         if not webbrowser.open("about:blank", new=2):
             raise RuntimeError("Default browser could not be opened.")

@@ -36,3 +36,10 @@ def test_unknown_fields_and_unlisted_alias_are_rejected(tmp_path):
     bad=c.post("/v1/tasks",headers=h,json={"action":"launch_app","app_alias":"notepad","run_at":future,"shell":"whoami"})
     assert bad.status_code==422
     assert c.post("/v1/tasks",headers=h,json={"action":"launch_app","app_alias":"powershell","run_at":future}).status_code==422
+
+def test_chatgpt_is_an_explicitly_allowlisted_schedule_target(tmp_path):
+    c=client(tmp_path); h={"Authorization":f"Bearer {TOKEN}"}
+    future=(datetime.now(timezone.utc)+timedelta(hours=1)).isoformat()
+    response=c.post("/v1/tasks",headers=h,json={"action":"launch_app","app_alias":"chatgpt","run_at":future})
+    assert response.status_code==201
+    assert response.json()["app_alias"]=="chatgpt"

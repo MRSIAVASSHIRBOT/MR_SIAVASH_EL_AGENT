@@ -17,7 +17,7 @@ from el_agent.store import TaskStore
 class ScheduleRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     action: Literal["launch_app"]
-    app_alias: Literal["notepad","calculator","explorer","browser"]
+    app_alias: Literal["notepad","calculator","explorer","browser","chatgpt"]
     run_at: datetime
     @field_validator("run_at")
     @classmethod
@@ -55,7 +55,7 @@ def create_app(*, token: str | None = None, store: TaskStore | None = None, scre
     @app.get("/v1/device")
     async def device(_: None = Depends(auth)):
         return {"platform":"windows","mode":"local","remote_access":False,
-                "supported_apps":sorted([*APP_ALLOWLIST,"browser"]),
+                "supported_apps":sorted([*APP_ALLOWLIST,"browser","chatgpt"]),
                 "capabilities":["device.heartbeat","screen.capture.explicit","app.launch.allowlisted","task.schedule.launch"]}
     @app.post("/v1/screenshot",status_code=201)
     async def screenshot(_: None = Depends(auth)):
