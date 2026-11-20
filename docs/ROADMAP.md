@@ -19,11 +19,13 @@
 - [x] Owner-initiated single-use device pairing
 - [x] Short-lived scoped credentials, device registry, and revocation
 - [x] Outbound heartbeat and Hub audit correlation
-- [ ] Hub-issued task dispatch with expiry, idempotency, cancellation, and verified outcomes
+- [x] Android foreground-only app.launch task claim with exact device/scope binding, lease checks, and explicit approve/reject dialog (CI passed; physical-device acceptance pending)
+- [ ] Hub-issued task dispatch live acceptance with expiry, idempotency, cancellation, and outcome reconciliation
 - [ ] Shared memory through Hub APIs only
 
 ## Platform expansion
 - [x] Android native companion preview: Kotlin app, Keystore-backed credentials, owner pairing, heartbeat, and allowlisted app launch (Android CI passed; physical-device acceptance pending)
+- [x] Android manual Hub app.launch claim with foreground-only owner approval, ChatGPT/browser-only alias policy, exact device/scope binding, and bounded outcome reporting (physical-device acceptance pending)
 - [ ] Browser extension with explicit host permissions
 - [ ] Cloud scheduling and online-device coordination
 ## Voice intelligence
