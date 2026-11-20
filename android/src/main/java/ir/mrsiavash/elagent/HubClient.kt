@@ -96,7 +96,7 @@ class HubClient(private val store: SecureStore) {
             .put("refresh_expires_at", now + refreshTtl * 1000L)
             .put("scopes", scopes)
         store.write(saved)
-        return "Paired successfully. Granted scopes: device.heartbeat"
+        return "Paired successfully. Granted scopes: ${grantedScopes.sorted().joinToString()}"
     }
 
     fun refreshIfNeeded(): JSONObject = synchronized(credentialLock) {
@@ -158,7 +158,10 @@ class HubClient(private val store: SecureStore) {
         require(taskId.isNotBlank() && action == "app.launch" && requiredScope == "app.launch") {
             "Hub returned an unsupported Android task contract."
         }
-        require("app.launch" in grantedScopes && app in setOf("chatgpt", "browser", "notepad", "calculator", "explorer")) {
+        require(
+            "app.launch" in grantedScopes && app != null &&
+            app in setOf("chatgpt", "browser", "notepad", "calculator", "explorer")
+        ) {
             "Task action is not supported by the Android companion."
         }
         require(timeout in 5L..60L && lease.length in 40..128) {
