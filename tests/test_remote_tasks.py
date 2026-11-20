@@ -196,30 +196,3 @@ def test_action_finishing_after_lease_expiry_is_not_reported_or_replayed(monkeyp
     assert result["action_attempted"] is True
 
 
-    class ControlledDateTime(real_datetime):
-        current = started_at
-
-        @classmethod
-        def now(cls, tz=None):
-            return cls.current if tz is not None else cls.current.replace(tzinfo=None)
-
-    claimed = _claimed()
-    claimed["lease_expires_at"] = lease_expiry.isoformat()
-    launched = []
-
-    def launch_and_advance_clock(alias):
-        launched.append(alias)
-        ControlledDateTime.current = lease_expiry + timedelta(milliseconds=1)
-
-    monkeypatch.setattr(remote_tasks, "datetime", ControlledDateTime)
-    monkeypatch.setattr(remote_tasks, "launch_app", launch_and_advance_clock)
-    monkeypatch.setattr(
-        remote_tasks, "_post",
-        lambda *_args, **_kwargs: pytest.fail("late task outcome must not be posted"),
-    )
-
-    result = remote_tasks.execute_claimed(claimed)
-
-    assert launched == ["notepad"]
-    assert result["reported_status"] == "not_reported_lease_expired"
-    assert result["action_attempted"] is True
