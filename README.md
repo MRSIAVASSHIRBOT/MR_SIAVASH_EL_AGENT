@@ -2,7 +2,7 @@
 
 **Personal Digital Operator — Windows desktop + Android companion preview**
 
-A device-side companion for the MR_SIAVASH ecosystem. Windows provides the local API, CLI, and desktop control center. The Android native companion adds owner-initiated Hub pairing, encrypted device credentials, periodic heartbeat, and explicit local ChatGPT/browser launch.
+A standalone personal agent for Windows and Android. Its local runtime and core actions work without Hub or other MR_SIAVASH projects; optional adapters add integrations when configured. Windows provides the local API, CLI, and desktop control center. Android provides local actions, encrypted settings, and optional Hub pairing.
 
 ## What works in this MVP
 
@@ -16,7 +16,7 @@ A device-side companion for the MR_SIAVASH ecosystem. Windows provides the local
 - A deterministic Persian/English command parser for a small allowlist (e.g. «اسکرین‌شات بگیر» and «برو داخل چت جی پی تی»); unknown commands are rejected.
 - CLI commands so everyday use does not require Swagger or custom scripts.
 
-MR_SIAVASH_HUB_AI is the authority for device identity, scoped credentials, registry, revocation, and device health. The companion currently sends outbound heartbeat metadata only; Hub-issued remote task dispatch and shared memory are not enabled yet.
+Hub integration is optional. When paired, MR_SIAVASH_HUB_AI manages that integration's device identity, scoped credentials, registry, revocation, and device health. The Agent remains independently usable when Hub is absent or unreachable; Hub-issued remote task dispatch and shared memory are not enabled yet.
 
 ## Requirements
 
