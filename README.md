@@ -83,4 +83,4 @@ See docs/ROADMAP.md and docs/SECURITY.md. CI tests Windows and Linux with Python
 
 ## Status
 
-The Windows-first code and automated tests are in the initial pull request. CI and live Windows acceptance must pass before this release is considered verified. Android, browser extension, Hub pairing, shared memory, and cloud scheduling are planned, not implemented.
+The Windows-first MVP is merged into main. Its automated test matrix passes on Windows and Ubuntu with Python 3.11 and 3.12. A clean Windows 11 installation and live screenshot/application-launch acceptance test are still required before calling the desktop behavior verified. The scheduled ChatGPT shortcut opens ChatGPT only; sending prompts or automating a conversation is not implemented. Android, browser extension, Hub pairing, shared memory, and cloud scheduling remain planned.

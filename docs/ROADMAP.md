@@ -4,9 +4,9 @@
 - [x] Local-only API design and implementation
 - [x] Bearer token setup and authentication
 - [x] Explicit screenshot endpoint
-- [x] Allowlisted application launch
+- [x] Allowlisted application launch, including fixed ChatGPT URL shortcut
 - [x] SQLite-backed scheduled app launch, task listing, and cancellation
-- [ ] Windows and Linux CI pass; fix all failures
+- [x] Windows and Linux CI pass on Python 3.11 and 3.12
 - [ ] Clean Windows 11 installation and live acceptance test
 - [ ] Friendly desktop launcher and startup integration
 
