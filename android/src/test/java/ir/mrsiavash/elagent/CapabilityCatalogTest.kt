@@ -10,9 +10,19 @@ class CapabilityCatalogTest {
         grants: Set<CapabilityId> = emptySet(),
         selected: Set<CapabilityId> = emptySet(),
         accessibility: Boolean = false,
+        ownerTaskId: String? = null,
         authorizedTasks: Set<String> = emptySet(),
         confirmations: Set<String> = emptySet()
-    ) = ActionContext(actionId, foreground, grants, selected, accessibility, authorizedTasks, confirmations)
+    ) = ActionContext(
+        actionId = actionId,
+        appInForeground = foreground,
+        grantedCapabilities = grants,
+        userSelectedResources = selected,
+        accessibilityServiceEnabled = accessibility,
+        ownerTaskId = ownerTaskId,
+        ownerAuthorizedTaskIds = authorizedTasks,
+        confirmedActionIds = confirmations
+    )
 
     @Test fun exposesBroadCatalogWithoutGrantingCapabilities() {
         assertEquals(22, CapabilityCatalog.all().size)
@@ -96,11 +106,11 @@ class CapabilityCatalogTest {
     @Test fun backgroundActionRequiresMatchingOwnerAuthorizedTask() {
         val denied = CapabilityCatalog.evaluate(
             CapabilityId.APP_LAUNCH, ActionEffect.LOCAL_CHANGE,
-            context(foreground = false, authorizedTasks = setOf("another-task"))
+            context(foreground = false, ownerTaskId = "task-1", authorizedTasks = setOf("another-task"))
         )
         val allowed = CapabilityCatalog.evaluate(
             CapabilityId.APP_LAUNCH, ActionEffect.LOCAL_CHANGE,
-            context(foreground = false, authorizedTasks = setOf("action-1"))
+            context(foreground = false, ownerTaskId = "task-1", authorizedTasks = setOf("task-1"))
         )
         assertFalse(denied.allowed)
         assertTrue(allowed.allowed)
