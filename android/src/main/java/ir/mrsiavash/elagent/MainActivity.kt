@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.view.ViewGroup
 import android.widget.Button
+import android.text.InputType
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -46,6 +47,7 @@ class MainActivity : Activity() {
         root.addView(TextView(this).apply {
             text = "Device ID: ${store.deviceId()}"
             textSize = 12f
+            setTextIsSelectable(true)
         })
         hubUrl = EditText(this).apply {
             hint = "Hub HTTPS address (https://...)"
@@ -53,6 +55,7 @@ class MainActivity : Activity() {
         }
         pairingCode = EditText(this).apply {
             hint = "One-time pairing code"
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
             setSingleLine(true)
         }
         root.addView(hubUrl, fieldParams())
