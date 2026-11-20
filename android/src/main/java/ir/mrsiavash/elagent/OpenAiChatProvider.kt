@@ -34,7 +34,7 @@ class OpenAiChatProvider(
             parsed.host == "api.openai.com" &&
             parsed.path == "/v1/chat/completions" &&
             parsed.userInfo == null && parsed.query == null && parsed.fragment == null
-        val loopbackTestEndpoint = parsed.scheme == "http" &&
+        val loopbackTestEndpoint = parsed.scheme in setOf("http", "https") &&
             parsed.host in setOf("127.0.0.1", "localhost")
         require(officialEndpoint || loopbackTestEndpoint) {
             "Cloud endpoint must be the official API HTTPS endpoint."
