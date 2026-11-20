@@ -168,20 +168,19 @@ class MainActivity : Activity() {
             setTextColor(Color.rgb(53, 214, 160))
         }, fieldParams())
         root.addView(TextView(this).apply {
-            text = "ارائه‌دهنده‌های رایگان · Gemini سپس Groq سپس OpenRouter"
+            text = "ارائه‌دهنده‌های رایگان · Gemini سپس OpenRouter"
             textSize = 14f
             setTextColor(Color.rgb(232, 245, 239))
         }, fieldParams())
         root.addView(TextView(this).apply {
-            text = "کلید هر سرویس اختیاری است و فقط در محفظهٔ رمزگذاری‌شدهٔ Android ذخیره می‌شود. برنامه فقط بین کلیدهای ذخیره‌شده جابه‌جا می‌شود و هیچ مسیر پولی یا ارتقای خودکاری ندارد. سهمیه و شرایط رایگان هر حساب را در پنل همان سرویس بررسی کنید."
+            text = "کلید هر سرویس اختیاری است و فقط در محفظهٔ رمزگذاری‌شدهٔ Android ذخیره می‌شود. برنامه فقط بین مسیرهای رایگان جابه‌جا می‌شود و هیچ مسیر پولی یا ارتقای خودکاری ندارد. رایگان‌بودن Gemini به Tier پروژه بستگی دارد؛ برنامه وضعیت Billing حساب را نمی‌تواند تشخیص دهد. برای تضمین هزینهٔ صفر، پروژهٔ Gemini باید Free Tier و بدون Billing فعال باشد."
             textSize = 12f
             setTextColor(Color.rgb(190, 205, 196))
         }, fieldParams())
         addFreeProviderKeyEditor(root, "gemini", "Google Gemini")
-        addFreeProviderKeyEditor(root, "groq", "Groq")
         addFreeProviderKeyEditor(root, "openrouter", "OpenRouter")
         root.addView(TextView(this).apply {
-            text = "مدل‌های پیش‌فرض: gemini-4-hydrogen · openai/gpt-oss-20b · openrouter/free. کلید قدیمی OpenAI حذف نمی‌شود، اما برنامه‌ریز رایگان از آن استفاده نمی‌کند."
+            text = "مدل‌های پیش‌فرض: gemini-4-hydrogen · openrouter/free. کلید قدیمی OpenAI حذف نمی‌شود، اما برنامه‌ریز رایگان از آن استفاده نمی‌کند."
             textSize = 12f
             setTextColor(Color.rgb(190, 205, 196))
         }, fieldParams())
