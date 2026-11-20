@@ -134,7 +134,7 @@ class DesktopControlCenter:
         mode = self.chat_mode.get()
         self.chat_prompt.set("")
         self.chat_send_button.configure(state="disabled")
-        self._append_chat("شما: " + prompt + "\\n")
+        self._append_chat("شما: " + prompt + "\n")
         self.status.set("در حال دریافت پاسخ از مسیر " + mode + "…")
 
         def worker():
@@ -144,10 +144,10 @@ class DesktopControlCenter:
                 answer = result.get("content", "")
                 provider = result.get("provider", "unknown")
                 fallback = " · بازگشت به مدل محلی" if result.get("fallback_used") else ""
-                message = f"Agent ({provider}){fallback}: {answer}\\n\\n"
+                message = f"Agent ({provider}){fallback}: {answer}\n\n"
                 status = "پاسخ دریافت شد · " + str(result.get("latency_ms", "?")) + " ms"
             except Exception as exc:
-                message = "خطا: " + str(exc) + "\\n\\n"
+                message = "خطا: " + str(exc) + "\n\n"
                 status = "دریافت پاسخ ناموفق بود؛ هیچ عملیات سیستمی اجرا نشد."
             try:
                 self.root.after(0, lambda: self._finish_chat(message, status))
