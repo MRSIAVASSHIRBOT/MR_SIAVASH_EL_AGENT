@@ -38,7 +38,7 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         store = SecureStore(this)
-        voiceController = LocalVoiceController(this, ::setStatus, ::handleVoiceTranscript)
+        voiceController = LocalVoiceController(this, ::setStatus, ::handleVoiceTranscript, ::finishVoiceUi)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.rgb(7, 19, 15))
@@ -181,6 +181,11 @@ class MainActivity : Activity() {
             if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) beginVoice()
             else setStatus("مجوز میکروفون داده نشد؛ قابلیت صوتی غیرفعال ماند.")
         }
+    }
+
+    private fun finishVoiceUi() {
+        voiceActive = false
+        if (::voiceButton.isInitialized) voiceButton.text = "شروع فرمان صوتی (محلی)"
     }
 
     private fun handleVoiceTranscript(transcript: String) {
