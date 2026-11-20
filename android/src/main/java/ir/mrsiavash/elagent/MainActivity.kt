@@ -277,9 +277,6 @@ class MainActivity : Activity() {
 
 
     private fun generatePlan() {
-        executionSession = null
-        pendingDocumentStepId = null
-        updateExecutionUi()
         val requestText = plannerRequest.text.toString()
         if (requestText.isBlank() || requestText.length > 4_000) {
             setStatus("درخواست باید بین ۱ تا ۴۰۰۰ نویسه باشد.")
@@ -294,6 +291,28 @@ class MainActivity : Activity() {
             return
         }
         val model = plannerModel.text.toString().trim()
+        val previous = executionSession
+        if (previous != null && !previous.isComplete()) {
+            AlertDialog.Builder(this)
+                .setTitle("جایگزینی طرح ناتمام؟")
+                .setMessage(
+                    "طرح قبلی هنوز تکمیل نشده است. ممکن است یک اقدام خارجی قبلاً به Android سپرده شده باشد. " +
+                        "جایگزینی، وضعیت تأییدنشدهٔ آن طرح را کنار می‌گذارد و هیچ اقدامی را تکرار نمی‌کند."
+                )
+                .setNegativeButton("ادامهٔ طرح قبلی", null)
+                .setPositiveButton("کنارگذاشتن و ساخت طرح جدید") { _, _ ->
+                    startPlanGeneration(requestText, key, model)
+                }
+                .show()
+        } else {
+            startPlanGeneration(requestText, key, model)
+        }
+    }
+
+    private fun startPlanGeneration(requestText: String, key: String, model: String) {
+        executionSession = null
+        pendingDocumentStepId = null
+        updateExecutionUi()
         plannerButton.isEnabled = false
         plannerOutput.text = "در حال ساخت طرح ساختاریافته…"
         setStatus("درخواست متنی به مدل آنلاین ارسال شد.")
@@ -312,7 +331,7 @@ class MainActivity : Activity() {
                     executionSession = if (plan.steps.isNotEmpty()) AgentPlanExecutionSession(plan) else null
                     pendingDocumentStepId = null
                     plannerOutput.text = AgentPlanPolicy.render(plan)
-                    setStatus("طرح دریافت و اعتبارسنجی شد؛ هیچ مرحله‌ای اجرا نشده است.")
+                    setStatus("طرح دریافت و اعتبارسنجی شد؛ هیچ مرحله‌ای هنوز اجرا نشده است.")
                     updateExecutionUi()
                 }.onFailure { error ->
                     plannerOutput.text = "ساخت یا اعتبارسنجی طرح ناموفق بود: ${error.message ?: "خطای نامشخص"}"
