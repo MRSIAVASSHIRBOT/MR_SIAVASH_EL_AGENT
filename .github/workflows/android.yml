@@ -2,8 +2,27 @@ name: Android
 on:
   push:
     branches: [main, "feat/**"]
+    paths:
+      - "android/**"
+      - "*.gradle.kts"
+      - "gradle.properties"
+      - "README.md"
+      - "docs/android-quickstart.md"
+      - "docs/ROADMAP.md"
+      - ".github/workflows/android.yml"
   pull_request:
+    paths:
+      - "android/**"
+      - "*.gradle.kts"
+      - "gradle.properties"
+      - "README.md"
+      - "docs/android-quickstart.md"
+      - "docs/ROADMAP.md"
+      - ".github/workflows/android.yml"
   workflow_dispatch:
+concurrency:
+  group: android-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
