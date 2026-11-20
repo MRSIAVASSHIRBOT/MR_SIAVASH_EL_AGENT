@@ -20,7 +20,7 @@ class HubClient(private val store: SecureStore) {
         .build()
     private val jsonType = "application/json; charset=utf-8".toMediaType()
 
-    companion object { private val credentialLock = Any() }
+    companion object {\n        private val credentialLock = Any()\n        private val processStartedAt = SystemClock.elapsedRealtime()\n    }
 
     private fun canonicalHubUrl(input: String): String {
         val uri = URI(input.trim())
@@ -118,7 +118,7 @@ class HubClient(private val store: SecureStore) {
         val payload = JSONObject()
             .put("agent_version", "0.3.0")
             .put("runtime_state", "ready")
-            .put("app_uptime_seconds", (SystemClock.elapsedRealtime() / 1000L).coerceAtMost(31_536_000L))
+            .put("app_uptime_seconds", ((SystemClock.elapsedRealtime() - processStartedAt) / 1000L).coerceAtMost(31_536_000L))
         val response = request(
             saved.getString("hub_url"), "/devices/heartbeat", payload,
             saved.getString("access_token"), saved.getString("device_id")
