@@ -32,7 +32,7 @@ class OpenAiChatProviderTest {
             "test-api-key-that-is-long-enough",
             "test-model",
             server.url("/v1/chat/completions").toString(),
-            OkHttpClient.Builder().followRedirects(false).build()
+            OkHttpClient.Builder().followRedirects(false).followSslRedirects(false).build()
         )
         assertEquals("Hello from cloud", provider.chat("hello"))
         val request = server.takeRequest()
