@@ -99,7 +99,7 @@ class OfflineModelsActivity : Activity() {
         pendingModelId = modelId
         val picker = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
-            type = "application/octet-stream"
+            type = "*/*"
             putExtra(Intent.EXTRA_TITLE, spec.fileName)
         }
         runCatching { startActivityForResult(picker, REQUEST_MODEL_FILE) }
