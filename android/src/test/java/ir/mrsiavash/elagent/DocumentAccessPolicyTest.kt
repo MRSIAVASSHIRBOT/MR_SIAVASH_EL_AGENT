@@ -18,6 +18,12 @@ class DocumentAccessPolicyTest {
         assertFalse(DocumentAccessPolicy.isSupportedTextMimeType(null))
     }
 
+    @Test fun requiresReadGrantBeforeAccessingSelectedResource() {
+        assertTrue(DocumentAccessPolicy.hasReadPermission(Intent.FLAG_GRANT_READ_URI_PERMISSION))
+        assertFalse(DocumentAccessPolicy.hasReadPermission(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION))
+        assertFalse(DocumentAccessPolicy.hasReadPermission(0))
+    }
+
     @Test fun persistsOnlyWhenProviderReturnsBothReadAndPersistableFlags() {
         assertTrue(DocumentAccessPolicy.canPersistReadPermission(
             Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
