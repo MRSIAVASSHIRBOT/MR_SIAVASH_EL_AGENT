@@ -2,9 +2,8 @@
 
 ## Requirements
 - Android 8.0 (API 26) or newer.
-- A Hub deployment reachable from the phone over HTTPS.
 - Android Studio with JDK 17, or Gradle 8.9 with Android SDK 35.
-- A Hub owner account. Do not put the owner's bearer token in the Android app.
+- A Hub deployment and owner account only if you want optional Hub pairing/heartbeat. Local actions and the text assistant do not require Hub. Do not put the owner's bearer token in the Android app.
 
 ## Build
 From the repository root:
