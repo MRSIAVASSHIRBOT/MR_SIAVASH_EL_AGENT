@@ -52,3 +52,9 @@ The adapter is a reusable platform component. Wiring it into MainActivity's UI a
 
 ## Validation status
 JVM tests cover policy decisions and text-preview policy. Android CI must validate compilation and tests on the exact PR head. Physical-device acceptance and UI integration remain pending.
+
+## Online planner integration
+
+The Android 0.4.0 planning panel sends only the user-entered text request after an explicit tap. The API key is stored in the AES-GCM encrypted SecureStore payload. The provider is pinned to the official OpenAI HTTPS endpoint and refuses redirects. Structured Outputs uses a strict JSON Schema, then AgentPlanParser independently enforces the app's operation allowlist, limits, HTTPS URL policy, unique identifiers, and backward-only dependency references.
+
+The supported plan operations are limited to fixed app aliases, HTTPS browser navigation, user-selected document reading, and displaying plain text. A generated plan is a proposal only: the app does not execute any step from model output. File contents, microphone audio, screenshots, memory, and Hub credentials are not included in planner requests.
