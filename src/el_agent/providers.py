@@ -157,12 +157,10 @@ class OpenAIChatProvider:
     """Official OpenAI API adapter; credentials are read only from the OS keyring."""
 
     def __init__(self, model: str | None = None, timeout: int = 45):
-        self.model = model or os.environ.get("EL_AGENT_CLOUD_MODEL", "")
+        self.model = model or os.environ.get("EL_AGENT_CLOUD_MODEL", "gpt-4o-mini")
         self.timeout = timeout
 
     def chat(self, prompt: str) -> ChatResult:
-        if not self.model:
-            raise ProviderError("Set EL_AGENT_CLOUD_MODEL before using the online provider.")
         keyring = _keyring_module()
         try:
             api_key = keyring.get_password(KEYRING_SERVICE, KEYRING_USERNAME)
