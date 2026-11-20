@@ -15,6 +15,8 @@ import android.text.InputType
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.Spinner
+import android.widget.ArrayAdapter
 import android.widget.TextView
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -32,6 +34,12 @@ class MainActivity : Activity() {
     private lateinit var pairingCode: EditText
     private lateinit var voiceController: LocalVoiceController
     private lateinit var voiceButton: Button
+    private lateinit var cloudApiKey: EditText
+    private lateinit var cloudModel: EditText
+    private lateinit var chatPrompt: EditText
+    private lateinit var chatMode: Spinner
+    private lateinit var chatOutput: TextView
+    private lateinit var chatSendButton: Button
     private var voiceActive = false
     private val recordAudioRequest = 4102
 
@@ -112,6 +120,75 @@ class MainActivity : Activity() {
             setOnClickListener { toggleVoice() }
         }
         root.addView(voiceButton, buttonParams())
+
+        root.addView(TextView(this).apply {
+            text = "دستیار هوشمند · آفلاین / آنلاین / ترکیبی"
+            textSize = 17f
+            setTextColor(Color.rgb(53, 214, 160))
+        }, fieldParams())
+        cloudApiKey = EditText(this).apply {
+            hint = "OpenAI API key (stored encrypted on this device)"
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.rgb(145, 170, 158))
+            setSingleLine(true)
+        }
+        root.addView(cloudApiKey, fieldParams())
+        root.addView(Button(this).apply {
+            text = "ذخیره امن کلید آنلاین"
+            setOnClickListener {
+                runCatching { store.saveCloudApiKey(cloudApiKey.text.toString()) }
+                    .onSuccess { cloudApiKey.text.clear(); setStatus("کلید در Android Keystore رمزگذاری و ذخیره شد.") }
+                    .onFailure { setStatus(it.message ?: "ذخیره کلید ناموفق بود.") }
+            }
+        }, buttonParams())
+        root.addView(Button(this).apply {
+            text = "حذف کلید آنلاین"
+            setOnClickListener {
+                store.clearCloudApiKey()
+                cloudApiKey.text.clear()
+                setStatus("کلید آنلاین از حافظه رمزگذاری‌شده حذف شد.")
+            }
+        }, buttonParams())
+        cloudModel = EditText(this).apply {
+            hint = "Cloud model (default: gpt-4o-mini)"
+            setText("gpt-4o-mini")
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.rgb(145, 170, 158))
+            setSingleLine(true)
+        }
+        root.addView(cloudModel, fieldParams())
+        chatMode = Spinner(this).apply {
+            adapter = ArrayAdapter(
+                this@MainActivity,
+                android.R.layout.simple_spinner_dropdown_item,
+                listOf("Offline", "Online", "Hybrid")
+            )
+        }
+        root.addView(chatMode, fieldParams())
+        chatPrompt = EditText(this).apply {
+            hint = "پیام یا فرمانت را بنویس…"
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.rgb(145, 170, 158))
+            minLines = 2
+            maxLines = 4
+        }
+        root.addView(chatPrompt, fieldParams())
+        chatSendButton = Button(this).apply {
+            text = "ارسال درخواست"
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(19, 185, 129))
+            setTextColor(Color.BLACK)
+            setOnClickListener { sendChat() }
+        }
+        root.addView(chatSendButton, buttonParams())
+        chatOutput = TextView(this).apply {
+            text = "Offline: اجرای فرمان‌های محلی مجاز. Online: پردازش ابری با انتخاب صریح. Hybrid: آنلاین و سپس fallback محلی."
+            textSize = 14f
+            setTextColor(Color.rgb(232, 245, 239))
+            setTextIsSelectable(true)
+        }
+        root.addView(chatOutput, fieldParams())
+
         root.addView(Button(this).apply {
             text = "Open ChatGPT"
             backgroundTintList = ColorStateList.valueOf(Color.rgb(13, 33, 25))
@@ -149,6 +226,52 @@ class MainActivity : Activity() {
         }
     }
 
+
+    private fun sendChat() {
+        val prompt = chatPrompt.text.toString().trim()
+        if (prompt.isBlank()) {
+            setStatus("ابتدا پیام یا فرمان را وارد کن.")
+            return
+        }
+        val mode = chatMode.selectedItem?.toString() ?: "Offline"
+        val model = cloudModel.text.toString().trim()
+        chatSendButton.isEnabled = false
+        chatOutput.text = "در حال پردازش درخواست در حالت $mode…"
+        executor.execute {
+            val result = when (mode) {
+                "Offline" -> runOfflineCommand(prompt)
+                "Online" -> runCatching {
+                    OpenAiChatProvider(store.cloudApiKey(), model).chat(prompt)
+                }.getOrElse { "خطای سرویس آنلاین: ${it.message ?: "unknown error"}" }
+                else -> runCatching {
+                    OpenAiChatProvider(store.cloudApiKey(), model).chat(prompt)
+                }.getOrElse { error ->
+                    val local = runOfflineCommand(prompt)
+                    if (local.startsWith("OFFLINE_UNSUPPORTED")) {
+                        "سرویس آنلاین در دسترس نبود (${error.message ?: "error"}). مدل زبانی آفلاین روی گوشی نصب نشده؛ فقط فرمان‌های محلی مجاز قابل اجرا هستند."
+                    } else {
+                        "سرویس آنلاین در دسترس نبود؛ fallback محلی انجام شد. $local"
+                    }
+                }
+            }
+            runOnUiThread {
+                chatOutput.text = result
+                chatSendButton.isEnabled = true
+                setStatus("پردازش درخواست پایان یافت · $mode")
+            }
+        }
+    }
+
+    private fun runOfflineCommand(prompt: String): String {
+        val alias = VoiceIntentResolver.resolve(prompt)
+            ?: return "OFFLINE_UNSUPPORTED: مدل زبانی آفلاین روی این نسخه نصب نیست؛ در حالت Offline فقط فرمان‌های صریح و مجاز پشتیبانی می‌شوند."
+        runOnUiThread {
+            runCatching { launchAllowlisted(alias) }
+                .onFailure { setStatus(it.message ?: "اجرای فرمان محلی ناموفق بود.") }
+        }
+        return if (alias == "chatgpt") "فرمان محلی مجاز: ChatGPT باز می‌شود."
+        else "فرمان محلی مجاز: مرورگر باز می‌شود."
+    }
 
     private fun toggleVoice() {
         if (voiceActive) {
