@@ -21,14 +21,14 @@ API = "http://127.0.0.1:8765"
 APP_ALIASES = ("notepad", "calculator", "explorer", "browser", "chatgpt")
 
 
-def _request(method: str, path: str, payload: dict | None = None):
+def _request(method: str, path: str, payload: dict | None = None, timeout: int = 8):
     body = json.dumps(payload).encode("utf-8") if payload is not None else None
     request = Request(API + path, data=body, method=method, headers={
         "Authorization": "Bearer " + load_token(),
         "Content-Type": "application/json",
     })
     try:
-        with urlopen(request, timeout=8) as response:
+        with urlopen(request, timeout=timeout) as response:
             raw = response.read()
             return json.loads(raw.decode("utf-8")) if raw else {}
     except HTTPError as exc:
@@ -69,6 +69,23 @@ class DesktopControlCenter:
         self._voice_stop_event = None
         self._voice_thread = None
 
+        chat_frame = ttk.LabelFrame(outer, text="دستیار هوشمند متنی · Local / Online / Hybrid", padding=10)
+        chat_frame.pack(fill="x", pady=5)
+        chat_controls = ttk.Frame(chat_frame)
+        chat_controls.pack(fill="x")
+        self.chat_mode = tk.StringVar(value="local")
+        ttk.Combobox(chat_controls, textvariable=self.chat_mode, values=("local", "online", "hybrid"),
+                     state="readonly", width=10).pack(side="left")
+        self.chat_prompt = tk.StringVar()
+        chat_entry = ttk.Entry(chat_controls, textvariable=self.chat_prompt)
+        chat_entry.pack(side="left", fill="x", expand=True, padx=8)
+        chat_entry.bind("<Return>", lambda _event: self.send_chat())
+        self.chat_send_button = ttk.Button(chat_controls, text="ارسال", command=self.send_chat)
+        self.chat_send_button.pack(side="right")
+        self.chat_output = tk.Text(chat_frame, height=5, wrap="word", state="disabled")
+        self.chat_output.pack(fill="x", pady=(8, 0))
+        ttk.Label(chat_frame, text="Local پیش‌فرض است؛ Online و Hybrid فقط با انتخاب خودت فعال می‌شوند.").pack(anchor="w")
+
         action_frame = ttk.LabelFrame(outer, text="عملیات مجاز", padding=10)
         action_frame.pack(fill="x", pady=5)
         self.app = tk.StringVar(value="chatgpt")
@@ -108,6 +125,47 @@ class DesktopControlCenter:
         ttk.Label(outer, textvariable=self.status, relief="sunken", anchor="w").pack(fill="x", pady=(8, 0))
         self.refresh_tasks()
         root.after(5000, self._poll_tasks)
+
+    def send_chat(self):
+        prompt = self.chat_prompt.get().strip()
+        if not prompt:
+            self.status.set("ابتدا پیام متنی را وارد کن.")
+            return
+        mode = self.chat_mode.get()
+        self.chat_prompt.set("")
+        self.chat_send_button.configure(state="disabled")
+        self._append_chat("شما: " + prompt + "\\n")
+        self.status.set("در حال دریافت پاسخ از مسیر " + mode + "…")
+
+        def worker():
+            try:
+                result = _request("POST", "/v1/assistant/chat",
+                                  {"prompt": prompt, "mode": mode}, timeout=55)
+                answer = result.get("content", "")
+                provider = result.get("provider", "unknown")
+                fallback = " · بازگشت به مدل محلی" if result.get("fallback_used") else ""
+                message = f"Agent ({provider}){fallback}: {answer}\\n\\n"
+                status = "پاسخ دریافت شد · " + str(result.get("latency_ms", "?")) + " ms"
+            except Exception as exc:
+                message = "خطا: " + str(exc) + "\\n\\n"
+                status = "دریافت پاسخ ناموفق بود؛ هیچ عملیات سیستمی اجرا نشد."
+            try:
+                self.root.after(0, lambda: self._finish_chat(message, status))
+            except tk.TclError:
+                pass
+
+        threading.Thread(target=worker, name="el-agent-chat", daemon=True).start()
+
+    def _append_chat(self, message: str):
+        self.chat_output.configure(state="normal")
+        self.chat_output.insert("end", message)
+        self.chat_output.see("end")
+        self.chat_output.configure(state="disabled")
+
+    def _finish_chat(self, message: str, status: str):
+        self._append_chat(message)
+        self.chat_send_button.configure(state="normal")
+        self.status.set(status)
 
     def start_voice(self):
         if self._voice_thread is not None and self._voice_thread.is_alive():
