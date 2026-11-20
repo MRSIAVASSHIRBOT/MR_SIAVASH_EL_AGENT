@@ -70,7 +70,7 @@ Cancel a pending task:
 
 ## Text intelligence (Windows first slice)
 
-The provider layer supports explicit `local`, `online`, and `hybrid` text chat. Local is the default. See [docs/PROVIDER_SETUP.md](docs/PROVIDER_SETUP.md) before configuring cloud access.
+The provider layer supports explicit `local`, `online`, and `hybrid` text chat. Local is the default; the cloud model defaults to `gpt-4o-mini` and can be overridden with `EL_AGENT_CLOUD_MODEL`. See [docs/PROVIDER_SETUP.md](docs/PROVIDER_SETUP.md) before configuring cloud access.
 
 ```powershell
 # Local Ollama; no prompt is sent to a cloud provider
@@ -78,7 +78,6 @@ el-agent chat --mode local "سلام، خودت را معرفی کن"
 
 # Optional cloud API (requires a separately billed API account/key)
 python -m pip install -e ".[cloud]"
-$env:EL_AGENT_CLOUD_MODEL = "YOUR_SUPPORTED_API_MODEL"
 el-agent provider-key set
 el-agent chat --mode online "Explain hybrid AI"
 
