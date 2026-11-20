@@ -14,7 +14,6 @@ The Windows CLI/desktop UI and Android UI select modes explicitly; there is no s
 
 ```powershell
 python -m pip install -e ".[cloud]"
-$env:EL_AGENT_CLOUD_MODEL = "YOUR_SUPPORTED_API_MODEL"
 el-agent provider-key set
 ```
 
@@ -41,7 +40,7 @@ el-agent chat --mode hybrid "Summarize the difference between local and cloud in
 el-agent ai-status
 ```
 
-Set `EL_AGENT_OLLAMA_MODEL` to change the local model (default `llama3.1:8b`). Set `EL_AGENT_CLOUD_MODEL` to a model enabled for the API account. Model availability, API pricing, quotas, and regional availability are controlled by the provider.
+Set `EL_AGENT_OLLAMA_MODEL` to change the local model (default `llama3.1:8b`). The cloud model defaults to `gpt-4o-mini`; optionally set `EL_AGENT_CLOUD_MODEL` to another model enabled for the API account. Model availability, API pricing, quotas, and regional availability are controlled by the provider.
 
 ## Android setup
 
