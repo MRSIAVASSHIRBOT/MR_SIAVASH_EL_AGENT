@@ -19,6 +19,7 @@ class LocalVoiceController(
     private var tts: TextToSpeech? = TextToSpeech(activity, this)
     private var ttsReady = false
     private var closed = false
+    private var cancelled = false
 
     fun start(): Boolean {
         if (closed) {
@@ -33,6 +34,7 @@ class LocalVoiceController(
             onStatus("On-device speech recognition is unavailable on this device.")
             return false
         }
+        cancelled = false
         return try {
             recognizer?.destroy()
             recognizer = SpeechRecognizer.createOnDeviceSpeechRecognizer(activity).also {
@@ -55,6 +57,11 @@ class LocalVoiceController(
 
     fun stop() { runCatching { recognizer?.stopListening() } }
 
+    fun cancel() {
+        cancelled = true
+        runCatching { recognizer?.cancel() }
+    }
+
     fun speak(message: String) {
         if (ttsReady && !closed) tts?.speak(message.take(240), TextToSpeech.QUEUE_FLUSH, null, "el-agent-local-reply")
         else onStatus(message)
@@ -70,8 +77,9 @@ class LocalVoiceController(
     override fun onReadyForSpeech(params: android.os.Bundle?) = onStatus("میکروفون فعال است؛ فرمان را بگو.")
     override fun onBeginningOfSpeech() = onStatus("در حال شنیدن فرمان…")
     override fun onEndOfSpeech() = onStatus("در حال پردازش محلی گفتار…")
-    override fun onError(error: Int) = onStatus("تشخیص گفتار محلی ناموفق بود (کد $error). دوباره تلاش کن.")
+    override fun onError(error: Int) { if (!cancelled) onStatus("تشخیص گفتار محلی ناموفق بود (کد $error). دوباره تلاش کن.") }
     override fun onResults(results: android.os.Bundle?) {
+        if (cancelled || closed) return
         val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.trim().orEmpty()
         if (text.isBlank()) onStatus("گفتاری تشخیص داده نشد؛ هیچ عملیاتی اجرا نشد.")
         else onTranscript(text)
