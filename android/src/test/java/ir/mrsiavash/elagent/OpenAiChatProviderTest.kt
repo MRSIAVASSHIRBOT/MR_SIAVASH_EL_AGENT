@@ -75,6 +75,9 @@ class OpenAiChatProviderTest {
         val schema = schemaConfig.getJSONObject("schema")
         assertEquals(false, schema.getBoolean("additionalProperties"))
         assertTrue(schema.getJSONArray("required").toString().contains("steps"))
+        assertFalse(payload.toString().contains("maxLength"))
+        assertFalse(payload.toString().contains("minLength"))
+        assertTrue(schema.getJSONArray("required").toString().contains("clarification"))
     }
 
     @Test fun refusesRedirectsWithoutForwardingCredential() {
@@ -94,6 +97,16 @@ class OpenAiChatProviderTest {
         assertThrows(IllegalArgumentException::class.java) {
             OpenAiChatProvider("test-api-key-that-is-long-enough", "model", "https://attacker.example/v1/chat/completions")
         }
+    }
+
+    @Test fun reportsStructuredOutputRefusalsWithoutParsingThemAsPlans() {
+        server.enqueue(MockResponse().setBody(
+            """{"choices":[{"finish_reason":"stop","message":{"refusal":"I cannot help with that request."}}]}"""
+        ))
+        val error = assertThrows(IllegalStateException::class.java) {
+            provider().chatJson("system", "unsafe request")
+        }
+        assertTrue(error.message!!.contains("declined"))
     }
 
     @Test fun rejectsTruncatedCompletions() {
