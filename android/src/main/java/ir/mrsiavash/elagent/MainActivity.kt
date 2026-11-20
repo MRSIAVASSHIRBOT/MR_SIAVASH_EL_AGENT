@@ -289,6 +289,9 @@ class MainActivity : Activity() {
             setStatus("ابتدا کلید API خود را در همین برنامه ذخیره کنید.")
             return
         }
+        executionSession = null
+        pendingDocumentStepId = null
+        updateExecutionUi()
         val model = plannerModel.text.toString().trim()
         plannerButton.isEnabled = false
         plannerOutput.text = "در حال ساخت طرح ساختاریافته…"
@@ -386,6 +389,7 @@ class MainActivity : Activity() {
                 }
             }
         }.onFailure { error ->
+            if (pendingDocumentStepId == step.id) pendingDocumentStepId = null
             runCatching { session.markFailed(step.id, error.message ?: "Action failed.") }
             setStatus("اجرای مرحله ناموفق بود؛ برای جلوگیری از اجرای تکراری، ادامهٔ طرح متوقف شد.")
         }
@@ -432,7 +436,13 @@ class MainActivity : Activity() {
             return
         }
 
-        val resultFlags = data.flags
+        val resultFlags = data?.flags ?: 0
+        if (!DocumentAccessPolicy.hasReadPermission(resultFlags)) {
+            session.markFailed(stepId, "Android did not grant read access to the selected document.")
+            setStatus("Android مجوز خواندن فایل را صادر نکرد؛ هیچ محتوایی خوانده نشد.")
+            updateExecutionUi()
+            return
+        }
         setBusy("در حال بررسی مجوز و خواندن فایل انتخاب‌شده به‌صورت محلی…")
         executor.execute {
             val readResult = runCatching {
