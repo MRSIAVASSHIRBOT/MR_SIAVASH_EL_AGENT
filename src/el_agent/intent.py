@@ -30,7 +30,7 @@ def parse_local_intent(text: str) -> dict[str, str] | None:
 
     screenshot_commands = {
         "screenshot", "screen shot", "take screenshot", "take a screenshot",
-        "capture screenshot", "اسکرین شات", "اسکرین شات بگیر",
+        "capture screenshot", "اسکرین شات", "اسکرین شات بگیر", "یک اسکرین شات بگیر",
         "عکس از صفحه", "عکس از صفحه بگیر", "از صفحه عکس بگیر",
     }
     if normalized in screenshot_commands:

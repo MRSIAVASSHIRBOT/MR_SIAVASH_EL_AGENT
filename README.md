@@ -2,7 +2,7 @@
 
 **Personal Digital Operator — Windows-first local MVP**
 
-A device-side companion for the MR_SIAVASH ecosystem. This first usable release provides a local Windows API and a simple CLI for explicit screenshot capture, allowlisted application launch, and scheduled application launch.
+A device-side companion for the MR_SIAVASH ecosystem. This release provides a local Windows API, CLI, and a Tk desktop control center for explicit screenshot capture, allowlisted application launch, Persian/English quick commands, and scheduled application launch.
 
 ## What works in this MVP
 
@@ -12,6 +12,8 @@ A device-side companion for the MR_SIAVASH ecosystem. This first usable release 
 - Launch Notepad, Calculator, Explorer, the default browser on a blank page, or ChatGPT at its fixed official URL.
 - Schedule one of those app launches up to 30 days ahead.
 - List and cancel pending scheduled tasks.
+- Desktop control center with task listing/cancellation and ISO-8601 scheduling.
+- A deterministic Persian/English command parser for a small allowlist (e.g. «اسکرین‌شات بگیر» and «برو داخل چت جی پی تی»); unknown commands are rejected.
 - CLI commands so everyday use does not require Swagger or custom scripts.
 
 The Hub remains the future authority for identity, shared memory, remote scheduling, policy, and multi-device coordination. This repository owns the local Windows companion runtime.
@@ -29,7 +31,7 @@ Open PowerShell in the downloaded/cloned repository directory:
     Set-ExecutionPolicy -Scope Process Bypass
     .\install.ps1
 
-The installer creates a virtual environment, installs the app, and creates a local API token. The token is printed once; keep it private.
+The installer creates a virtual environment, installs the app, creates a local API token, and places a desktop shortcut that opens the control center. The token is printed once; keep it private.
 
 If you prefer manual installation:
 
@@ -41,11 +43,15 @@ If you prefer manual installation:
 
 ## Run
 
-Keep the agent server running in one PowerShell window:
+Start the desktop control center (it starts the local API automatically if needed):
+
+    .\.venv\Scripts\el-agent.exe gui
+
+Or run the API separately without the GUI:
 
     .\.venv\Scripts\el-agent.exe serve
 
-In a second PowerShell window, run commands from the repository directory:
+In another PowerShell window, run commands from the repository directory:
 
     .\.venv\Scripts\el-agent.exe status
     .\.venv\Scripts\el-agent.exe screenshot
@@ -62,7 +68,15 @@ Cancel a pending task:
 
     .\.venv\Scripts\el-agent.exe cancel TASK_ID
 
-The API documentation is available locally at http://127.0.0.1:8765/docs.
+Optional: start the local Agent automatically after this Windows user signs in (no administrator elevation required):
+
+    .\\install-startup.ps1
+
+Remove that startup task at any time with:
+
+    .\\uninstall-startup.ps1
+
+This startup option runs the loopback-only API in the background; it does not enable remote access. The API documentation is available locally at http://127.0.0.1:8765/docs.
 
 ## Security boundaries
 
@@ -83,4 +97,4 @@ See docs/ROADMAP.md and docs/SECURITY.md. CI tests Windows and Linux with Python
 
 ## Status
 
-The Windows-first MVP is merged into main. Its automated test matrix passes on Windows and Ubuntu with Python 3.11 and 3.12. A clean Windows 11 installation and live screenshot/application-launch acceptance test are still required before calling the desktop behavior verified. The scheduled ChatGPT shortcut opens ChatGPT only; sending prompts or automating a conversation is not implemented. Android, browser extension, Hub pairing, shared memory, and cloud scheduling remain planned.
+The Windows-first MVP is merged into main. The desktop control center and bounded Persian/English command grammar are implemented in the current development branch; they are not yet merged into main. Automated CI is required on Windows and Ubuntu with Python 3.11 and 3.12; a clean Windows 11 installation and live screenshot/application-launch acceptance test are still required before calling desktop behavior verified. The scheduled ChatGPT shortcut opens ChatGPT only; sending prompts or automating a conversation is not implemented. Android, browser extension, Hub pairing, shared memory, and cloud scheduling remain planned.

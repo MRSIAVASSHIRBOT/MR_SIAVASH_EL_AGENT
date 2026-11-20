@@ -7,6 +7,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 import uvicorn
 from el_agent.security import create_token, load_token, token_path
+from el_agent.intent import parse_local_intent
 
 API = "http://127.0.0.1:8765"
 
@@ -30,11 +31,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="el-agent", description="MR_SIAVASH_EL_AGENT local Windows companion")
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("setup", help="Create local API bearer token")
+    commands.add_parser("gui", help="Open desktop control center and start local API if needed")
     serve = commands.add_parser("serve", help="Start local companion API")
     serve.add_argument("--host", choices=["127.0.0.1", "localhost"], default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8765)
     commands.add_parser("status", help="Show local device capabilities")
     commands.add_parser("screenshot", help="Capture an explicit local screenshot")
+    ask = commands.add_parser("ask", help="Run a fixed Persian/English local command")
+    ask.add_argument("text", nargs="+", help="For example: اسکرین شات بگیر | برو داخل چت جی پی تی")
     launch = commands.add_parser("launch", help="Launch an allowlisted application")
     launch.add_argument("alias", choices=["notepad", "calculator", "explorer", "browser", "chatgpt"])
     schedule = commands.add_parser("schedule", help="Schedule an allowlisted app launch")
@@ -57,8 +61,20 @@ def main() -> None:
         from el_agent.api import create_app
         uvicorn.run(create_app(), host=args.host, port=args.port, access_log=False, server_header=False)
         return
+    if args.command == "gui":
+        from el_agent.desktop import main as desktop_main
+        desktop_main()
+        return
     try:
-        if args.command == "status":
+        if args.command == "ask":
+            intent = parse_local_intent(" ".join(args.text))
+            if intent is None:
+                raise ValueError("Unknown command. Only fixed, allowlisted Persian/English commands are supported.")
+            if intent["action"] == "screenshot":
+                result = api_call("POST", "/v1/screenshot")
+            else:
+                result = api_call("POST", f"/v1/apps/{intent['app_alias']}/launch")
+        elif args.command == "status":
             result = api_call("GET", "/v1/device")
         elif args.command == "screenshot":
             result = api_call("POST", "/v1/screenshot")
