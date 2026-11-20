@@ -243,7 +243,7 @@ class MainActivity : Activity() {
 
     override fun onPause() {
         if (voiceActive) {
-            voiceController.stop()
+            voiceController.cancel()
             voiceActive = false
             if (::voiceButton.isInitialized) voiceButton.text = "شروع فرمان صوتی (محلی)"
         }
