@@ -118,6 +118,7 @@ def _validated_tokens(result: dict[str, object]) -> dict[str, object]:
         or not isinstance(access_ttl, int) or not 30 <= access_ttl <= 3600
         or not isinstance(refresh_ttl, int) or not 3600 <= refresh_ttl <= 90 * 24 * 3600
         or not isinstance(scopes, list) or not all(isinstance(scope, str) for scope in scopes)
+        or set(scopes) != {"device.heartbeat"}
     ):
         raise HubClientError("Hub returned invalid device credentials.")
     now = datetime.now(timezone.utc)
@@ -230,6 +231,8 @@ def heartbeat_once() -> dict[str, object]:
         raise HubClientError("Local Hub credential expiry metadata is invalid.") from exc
     if access_expiry.tzinfo is None or refresh_expiry.tzinfo is None:
         raise HubClientError("Local Hub credential expiry metadata must include a timezone.")
+    if credentials.get("scopes") != ["device.heartbeat"]:
+        raise HubClientError("Local Hub credentials do not have the expected heartbeat-only scope.")
     if refresh_expiry <= now:
         raise HubClientError("Hub refresh credential expired; owner-initiated re-pairing is required.")
     if access_expiry <= now + timedelta(seconds=HEARTBEAT_REFRESH_WINDOW_SECONDS):
