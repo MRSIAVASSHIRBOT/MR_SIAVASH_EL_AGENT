@@ -265,6 +265,82 @@ def test_windows_legacy_credentials_migrate_to_vault_before_plaintext_delete(tmp
     assert len(fake_vault) == 1
 
 
+
+def test_invalid_legacy_credentials_are_not_migrated_or_deleted(tmp_path, monkeypatch):
+    from el_agent import credential_store
+
+    _use_tmp_data_dir(monkeypatch, tmp_path)
+    fake_vault = {}
+
+    class FakeKeyring:
+        def get_password(self, service, username):
+            return fake_vault.get((service, username))
+
+        def set_password(self, service, username, password):
+            fake_vault[(service, username)] = password
+
+        def delete_password(self, service, username):
+            fake_vault.pop((service, username), None)
+
+    monkeypatch.setattr(hub.platform, "system", lambda: "Windows")
+    monkeypatch.setattr(credential_store, "_windows_keyring", lambda: FakeKeyring())
+    legacy = hub.credentials_path()
+    legacy.parent.mkdir(parents=True, exist_ok=True)
+    legacy_record = {
+        "hub_url": "https://hub.example.test",
+        "device_id": hub.get_device_id(),
+        "access_token": "short",
+        "refresh_token": _token("r"),
+        "access_expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(),
+        "refresh_expires_at": (datetime.now(timezone.utc) + timedelta(days=10)).isoformat(),
+        "scopes": ["device.heartbeat"],
+    }
+    legacy.write_text(json.dumps(legacy_record), encoding="utf-8")
+
+    with pytest.raises(hub.HubClientError, match="failed validation"):
+        hub.load_credentials()
+
+    assert legacy.exists(), "invalid plaintext data must be preserved for manual recovery"
+    assert fake_vault == {}, "invalid credentials must never be written to the OS vault"
+
+
+def test_invalid_vault_record_does_not_delete_matching_legacy_copy(tmp_path, monkeypatch):
+    from el_agent import credential_store
+
+    _use_tmp_data_dir(monkeypatch, tmp_path)
+    fake_vault = {}
+
+    class FakeKeyring:
+        def get_password(self, service, username):
+            return fake_vault.get((service, username))
+
+        def set_password(self, service, username, password):
+            fake_vault[(service, username)] = password
+
+        def delete_password(self, service, username):
+            fake_vault.pop((service, username), None)
+
+    monkeypatch.setattr(hub.platform, "system", lambda: "Windows")
+    monkeypatch.setattr(credential_store, "_windows_keyring", lambda: FakeKeyring())
+    legacy = hub.credentials_path()
+    legacy.parent.mkdir(parents=True, exist_ok=True)
+    invalid = {
+        "hub_url": "https://hub.example.test",
+        "device_id": hub.get_device_id(),
+        "access_token": "short",
+        "refresh_token": _token("r"),
+        "access_expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(),
+        "refresh_expires_at": (datetime.now(timezone.utc) + timedelta(days=10)).isoformat(),
+        "scopes": ["device.heartbeat"],
+    }
+    legacy.write_text(json.dumps(invalid), encoding="utf-8")
+    fake_vault[(credential_store.SERVICE_NAME, credential_store.CREDENTIAL_USERNAME)] = json.dumps(invalid)
+
+    with pytest.raises(hub.HubClientError, match="failed validation"):
+        hub.load_credentials()
+
+    assert legacy.exists(), "the legacy copy must remain until the vault record validates"
+
 def test_heartbeat_accepts_additional_explicitly_granted_device_scopes(tmp_path, monkeypatch):
     _use_tmp_data_dir(monkeypatch, tmp_path)
     now = datetime.now(timezone.utc)
