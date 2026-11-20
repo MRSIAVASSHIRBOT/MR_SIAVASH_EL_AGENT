@@ -67,7 +67,7 @@ class MainActivity : Activity() {
             setTextColor(Color.rgb(232, 245, 239))
         })
         root.addView(TextView(this).apply {
-            text = "Android companion · v0.4.0"
+            text = "Android companion · v0.5.0"
             textSize = 14f
             setTextColor(Color.rgb(168, 196, 183))
         })
@@ -458,7 +458,11 @@ class MainActivity : Activity() {
                         "نوع فایل: ${preview.mimeType}\nحجم خوانده‌شده: ${preview.bytesRead} بایت\n" +
                             "دسترسی پایدار: ${if (persisted) "بله" else "خیر؛ فقط دسترسی موقت انتخاب‌گر"}\n\n" +
                             preview.text
-                    session.markCompleted(stepId, detail = "فایل انتخاب‌شده فقط روی دستگاه پیش‌نمایش شد.")
+                    session.markCompleted(
+                        stepId,
+                        resourceVerified = true,
+                        detail = "فایل انتخاب‌شده فقط روی دستگاه پیش‌نمایش شد."
+                    )
                     setStatus("فایل به‌صورت محلی پیش‌نمایش شد و به Cloud ارسال نشد.")
                 }.onFailure { error ->
                     session.markFailed(stepId, error.message ?: "Local document preview failed.")
