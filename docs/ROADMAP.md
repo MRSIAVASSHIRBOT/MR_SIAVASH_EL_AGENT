@@ -25,7 +25,7 @@
 
 ## Platform expansion
 - [x] Android native companion preview: Kotlin app, Keystore-backed credentials, owner pairing, heartbeat, and allowlisted app launch
-- [x] Android manual Hub app.launch task claim with explicit foreground button, platform-specific alias handling, lease-deadline checks, and bounded outcome reporting (Android CI pending; physical-device acceptance pending)
+- [x] Android manual Hub app.launch task claim with explicit foreground button, ChatGPT/browser-only alias policy, exact device/scope binding, lease-deadline checks, and bounded outcome reporting (exact-head Android CI passed 2026-11-20; physical-device acceptance pending)
 - [ ] Android background task scheduling, notification-based approvals, and screenshot support (separate permission/security review)
 - [ ] Browser extension with explicit host permissions
 - [ ] Cloud scheduling and online-device coordination
@@ -53,7 +53,7 @@ No item is complete until code, tests, privacy review, and platform acceptance e
 | 1. Core integration | Hub pairing, stable device identity, heartbeat, owner-scoped task contract on Hub PR #460, scoped consumer client on this branch | Deploy merged Hub task API; live owner pairing with least-privilege scopes; verify revocation and task audit |
 | 2. Windows Agent | Loopback API, bearer auth, explicit screenshot, allowlisted app launch, desktop UI, local scheduler, Hub task consumer implementation | Clean Windows 11 install, real screenshot/app launch, remote task round-trip and recovery on the owner's machine |
 | 3. Autonomous Scheduler | Durable local scheduler and Hub-side scheduled queue contract | Live scheduled execution, missed-task reconciliation, bounded retry and expiry tests across restart/offline windows |
-| 4. Android & Browser | Android pairing, encrypted Keystore credentials, heartbeat, local voice and app-launch preview | Physical Android acceptance; background task scheduling and browser extension remain unimplemented |
+| 4. Android & Browser | Android pairing, encrypted Keystore credentials, heartbeat, local voice, and foreground-only owner-approved Hub app.launch flow | Physical Android acceptance; background task scheduling, screenshot capture, and browser extension remain unimplemented |
 | 5. Digital Representative | Deterministic Persian/English intents and local voice command routing | Owner-approved preference memory, bounded planning, multi-mission state and evidence-based self-evaluation |
 | 6. Ecosystem Integration | Hub and website public Gateway contracts exist; three repositories remain separated by explicit trust boundaries | Dashboard device/task views, controlled cross-project memory API, multi-device orchestration and end-to-end acceptance |
 
