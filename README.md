@@ -93,7 +93,7 @@ Quick setup check:
 
 The wake word «سیا» and optional cloud reasoning remain later phases.
 
-## Pair with MR_SIAVASH_HUB_AI (heartbeat scope only)
+## Pair with MR_SIAVASH_HUB_AI (owner-granted device scopes)
 
 The Hub API must be deployed and reachable over HTTPS (HTTP is accepted only for localhost). Pairing is owner-initiated and the one-time code expires after five minutes.
 
@@ -125,7 +125,7 @@ The Hub API must be deployed and reachable over HTTPS (HTTP is accepted only for
 
        .\.venv\Scripts\el-agent.exe hub-status
 
-Once paired, the local Agent sends a minimal heartbeat when its API starts. Only the device ID, agent version, runtime state, and uptime are sent. The first release does not accept remote tasks or access screenshots/files through Hub.
+On Windows, the local Agent sends minimal heartbeat metadata and polls the Hub task queue; only allowlisted app.launch and explicitly owner-confirmed screen.capture are accepted, with screenshots remaining local. On Android, task claiming is manual and foreground-only: the owner taps **Check Hub tasks**, then approves or rejects each supported app.launch in a dialog. Android supports only ChatGPT/browser launch and never accepts remote screenshot or background-launch tasks. Both consumers require live Hub deployment and physical-device acceptance.
 
 To disconnect, run el-agent unpair to remove local credentials, then revoke the device from the Hub owner device registry using DELETE /devices/{device_id}. Local unpairing alone does not revoke the Hub-side device record. If you later need to pair this installation again after revocation, run el-agent reset-device-id and type RESET; this creates a new device identity without changing any existing Hub audit history.
 
@@ -161,7 +161,7 @@ The native Android project is in `android/`. It currently supports:
 
 The Android companion also includes an online structured planner with owner-reviewed sequential execution (v0.5.0). The planner now uses a zero-cost-first provider chain: Google Gemini Free tier, then OpenRouter's free-model router. Only providers with user-saved keys are attempted; the legacy OpenAI key is preserved but is not used by the free-only planner. There is no paid-provider fallback, automatic upgrade, or credit purchase. Provider keys are stored in the Android Keystore-encrypted local payload. Transient rate limits, quota exhaustion, authentication failures, and invalid model responses are distinguished; the next configured free provider is tried once, without retry storms. The model output is independently validated on-device before any execution session is created. Each step still requires a separate owner confirmation and passes the Android capability policy. External intents remain pending until the owner returns and acknowledges the result; selected documents are read only after the Android picker returns a read grant. Interrupted or failed sessions are not replayed. Selected file content, microphone audio, screenshots, Hub credentials, and local memory are not attached to planning requests. Google's Free-tier project must have billing disabled; the app cannot inspect external billing settings. Free-tier quotas and privacy terms vary by provider and may change. See [Android free-provider routing](docs/android-free-provider-routing.md) for setup and limits.
 
-The Android preview includes a foreground, button-initiated, on-device push-to-talk prototype on Android 12+ when the device provides an offline recognizer and Persian language support. Microphone permission is requested at runtime; each capture is limited to 15 seconds and listening stops when the activity leaves the foreground. It never falls back to cloud recognition. Only the fixed ChatGPT/browser aliases are executable. The Android preview does **not** yet provide screen capture, arbitrary app control, remote task dispatch, background UI launching, or shared memory. The current Hub task-dispatch API is still being developed separately; the Android client intentionally does not pretend that remote tasks are available yet.
+The Android preview includes a foreground, button-initiated, on-device push-to-talk prototype on Android 12+ when the device provides an offline recognizer and Persian language support. Microphone permission is requested at runtime; each capture is limited to 15 seconds and listening stops when the activity leaves the foreground. It never falls back to cloud recognition. Android can manually claim one Hub app.launch task from the Tools screen; each launch requires an explicit approve/reject dialog and supports only ChatGPT/browser. Android does **not** support remote screenshots, arbitrary app control, unattended background task execution, or shared memory. Physical-device acceptance remains pending.
 
 Build a debug APK:
 ```bash
