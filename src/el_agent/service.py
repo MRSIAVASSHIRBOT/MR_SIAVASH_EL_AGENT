@@ -34,6 +34,12 @@ async def scheduler_loop(store: TaskStore) -> None:
         await asyncio.sleep(1)
 
 
+async def hub_task_loop() -> None:
+    """Consume Hub-authorized device tasks with bounded action contracts."""
+    from el_agent.remote_tasks import hub_task_loop as run_remote_tasks
+    await run_remote_tasks()
+
+
 async def hub_heartbeat_loop() -> None:
     """Synchronize only minimal device health metadata with the paired Hub."""
     from el_agent.hub import HEARTBEAT_INTERVAL_SECONDS, HubClientError, heartbeat_once
