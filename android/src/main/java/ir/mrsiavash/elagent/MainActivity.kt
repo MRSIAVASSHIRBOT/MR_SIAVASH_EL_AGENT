@@ -256,7 +256,7 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
-        voiceController.close()
+        if (::voiceController.isInitialized) voiceController.close()
         executor.shutdown()
         super.onDestroy()
     }
