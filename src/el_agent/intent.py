@@ -19,7 +19,7 @@ def _normalize(text: str) -> str:
     value = value.replace("\u200c", " ").replace("ي", "ی").replace("ك", "ک")
     value = re.sub(r"[!?؟،,.؛:]+", " ", value)
     value = " ".join(value.split())
-    return value.removeprefix("لطفا ").strip()
+    return value.removeprefix("لطفاً ").removeprefix("لطفا ").strip()
 
 
 def parse_local_intent(text: str) -> dict[str, str] | None:
