@@ -1,11 +1,15 @@
 package ir.mrsiavash.elagent
 
 import android.app.Activity
+import android.app.ActivityManager
+import android.app.AlertDialog
 import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.view.ViewGroup
+import android.text.InputType
+import android.widget.EditText
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -15,8 +19,8 @@ import java.util.concurrent.Executors
 /**
  * Owner-facing offline model import screen.
  *
- * Imported model files are stored safely but are not executable until the native
- * Whisper.cpp / llama.cpp runtimes are integrated in a later increment.
+ * Whisper models are currently import-only. The Qwen model can use the optional
+ * llama.cpp native runtime when the device has sufficient available memory.
  */
 class OfflineModelsActivity : Activity() {
     private val ioExecutor = Executors.newSingleThreadExecutor()
@@ -76,6 +80,14 @@ class OfflineModelsActivity : Activity() {
                 isAllCaps = false
                 setOnClickListener { chooseModelFile(spec.id) }
             }, params())
+
+            if (spec.engine == OfflineModelEngine.LLAMA_CPP) {
+                content.addView(Button(this).apply {
+                    text = "اجرای آزمایشی مدل فارسی (آفلاین)"
+                    isAllCaps = false
+                    setOnClickListener { showLlmPrompt() }
+                }, params())
+            }
         }
 
         status = TextView(this).apply {
@@ -138,6 +150,64 @@ class OfflineModelsActivity : Activity() {
         }
     }
 
+    private fun showLlmPrompt() {
+        if (!NativeLlamaRuntime.isAvailable) {
+            status.text = "موتور بومی LLM در این نسخه بارگذاری نشده است."
+            return
+        }
+        val input = EditText(this).apply {
+            hint = "یک پرسش کوتاه به فارسی بنویس…"
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+            minLines = 2
+            maxLines = 5
+        }
+        AlertDialog.Builder(this)
+            .setTitle("گفت‌وگوی آزمایشی آفلاین")
+            .setMessage("مدل فقط پس از فشردن اجرا بارگذاری می‌شود. برای کاهش مصرف حافظه، پاسخ کوتاه تولید خواهد شد.")
+            .setView(input)
+            .setNegativeButton("انصراف", null)
+            .setPositiveButton("اجرا") { _, _ ->
+                val prompt = input.text.toString().trim().take(1000)
+                if (prompt.isBlank()) {
+                    status.text = "متن پرسش خالی است."
+                    return@setPositiveButton
+                }
+                status.text = "در حال بررسی حافظه و آماده‌سازی مدل محلی…"
+                ioExecutor.execute {
+                    val result = runCatching {
+                        val manager = getSystemService(ACTIVITY_SERVICE) as ActivityManager
+                        val memory = ActivityManager.MemoryInfo()
+                        manager.getMemoryInfo(memory)
+                        if (memory.availMem < MIN_AVAILABLE_MEMORY_BYTES) {
+                            throw IllegalStateException("حافظهٔ آزاد کافی نیست؛ برنامه‌های دیگر را نبند یا داده‌ای را حذف نکن. بعداً دوباره امتحان کن.")
+                        }
+                        val installed = modelStore.installedModels()
+                            .firstOrNull { it.spec.id == "qwen3-06b-farsi-q4km" }
+                            ?: throw IllegalStateException("ابتدا فایل Qwen را وارد کن.")
+                        if (!NativeLlamaRuntime.loadModel(installed.file, contextTokens = 512, threads = 2)) {
+                            throw IllegalStateException("بارگذاری مدل ناموفق بود.")
+                        }
+                        try {
+                            val chatPrompt = "<|im_start|>system\nتو یک دستیار فارسی دقیق و مفید هستی. پاسخ را کوتاه و روشن بده. /no_think<|im_end|>\n" +
+                                "<|im_start|>user\n$prompt<|im_end|>\n<|im_start|>assistant\n"
+                            NativeLlamaRuntime.generate(chatPrompt, maxTokens = 80)
+                                .ifBlank { "مدل پاسخی تولید نکرد؛ ممکن است قالب مدل یا حافظهٔ دستگاه محدودیت ایجاد کرده باشد." }
+                        } finally {
+                            NativeLlamaRuntime.unload()
+                        }
+                    }
+                    runOnUiThread {
+                        result.onSuccess { answer ->
+                            status.text = "پاسخ مدل آفلاین:\n$answer"
+                        }.onFailure { error ->
+                            status.text = "اجرای مدل ناموفق بود: ${error.message ?: "خطای نامشخص"}"
+                        }
+                    }
+                }
+            }
+            .show()
+    }
+
     private fun refreshStatus() {
         ioExecutor.execute {
             val installed = modelStore.installedModels().associateBy { it.spec.id }
@@ -166,5 +236,6 @@ class OfflineModelsActivity : Activity() {
 
     companion object {
         private const val REQUEST_MODEL_FILE = 4201
+        private const val MIN_AVAILABLE_MEMORY_BYTES = 1200L * 1024L * 1024L
     }
 }
