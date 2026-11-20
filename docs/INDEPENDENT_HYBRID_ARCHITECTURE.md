@@ -69,7 +69,9 @@ Each result includes provider ID, mode, latency, confidence/finish reason when a
 
 ## Online service topology
 
-Cloud providers must be called through a small secured Agent Gateway or user-controlled backend, not directly from the Android client with embedded API keys. The gateway:
+Preferred cross-device topology: use a secured Agent Gateway so Android does not need a long-lived provider key and provider policy can be centralized. A direct provider connection is also permitted as an explicitly selected standalone mode only when the user supplies their own key, the key is encrypted at rest with Android Keystore (Android) or a native OS credential vault (desktop), the endpoint is fixed HTTPS, redirects are refused, and the key is never embedded in the APK or source control.
+
+The gateway, when deployed:
 - authenticates the device/user with scoped short-lived credentials;
 - enforces provider allowlists, quotas, request-size limits, and rate limits;
 - strips unnecessary metadata and supports redaction;
@@ -78,7 +80,7 @@ Cloud providers must be called through a small secured Agent Gateway or user-con
 - records privacy-minimized audit metadata;
 - can be disabled without affecting offline operation.
 
-The gateway is an optional deployment. Local mode must not require it. If a provider offers direct OAuth or a safe user-managed credential flow, document its threat model before adopting it.
+The gateway is an optional deployment. Local mode must not require it. Direct provider mode must be explicitly selected per request and must disclose that the typed prompt is sent to the selected provider. Document the threat model before enabling any new credential flow.
 
 ## Shared action and policy contract
 
