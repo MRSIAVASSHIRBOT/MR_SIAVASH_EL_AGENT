@@ -103,7 +103,7 @@ class LocalVoiceController(
         mainHandler.removeCallbacks(captureTimeout)
         if (!cancelled) {
             onFinished()
-            onStatus("تشخیص گفتار محلی ناموفق بود (کد $error). دوباره تلاش کن.")
+            onStatus("تشخیص گفتار محلی ناموفق بود (کد $error): " + SpeechErrorMessages.describe(error))
         }
     }
     override fun onResults(results: android.os.Bundle?) {
