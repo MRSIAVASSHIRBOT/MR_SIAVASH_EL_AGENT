@@ -53,7 +53,7 @@ def test_claim_one_uses_device_auth_and_returns_claim(monkeypatch):
     monkeypatch.setattr(remote_tasks, "_post", fake_post)
     result = remote_tasks.claim_one()
 
-    assert result["task"]["task_id"] == "task-1"
+    assert result["task"]["task_id"] == "00000000-0000-0000-0000-000000000002"
     assert result["lease_token"] == "x" * 48
     assert datetime.fromisoformat(result["lease_expires_at"]) > datetime.now(timezone.utc)
     assert seen["path"] == "/devices/tasks/claim"
