@@ -51,3 +51,37 @@ def test_device_advertises_fixed_chatgpt_alias_and_local_capabilities(tmp_path):
     body=response.json()
     assert "chatgpt" in body["supported_apps"]
     assert body["remote_access"] is False
+
+
+def test_assistant_chat_requires_auth_and_returns_provider_metadata(tmp_path, monkeypatch):
+    class FakeResult:
+        content = "سلام"
+        provider = "test-local"
+        model = "test-model"
+        mode = "local"
+        latency_ms = 7
+        fallback_used = False
+
+    class FakeRouter:
+        def chat(self, prompt, mode):
+            assert prompt == "سلام"
+            assert mode == "local"
+            return FakeResult()
+
+    monkeypatch.setattr("el_agent.api.ProviderRouter", FakeRouter)
+    c = client(tmp_path)
+    assert c.post("/v1/assistant/chat", json={"prompt": "سلام"}).status_code == 401
+    headers = {"Authorization": f"Bearer {TOKEN}"}
+    response = c.post("/v1/assistant/chat", headers=headers, json={"prompt": "سلام"})
+    assert response.status_code == 200
+    assert response.json()["provider"] == "test-local"
+    assert response.json()["content"] == "سلام"
+
+
+def test_assistant_chat_rejects_blank_oversized_and_unknown_fields(tmp_path):
+    c = client(tmp_path)
+    headers = {"Authorization": f"Bearer {TOKEN}"}
+    assert c.post("/v1/assistant/chat", headers=headers, json={"prompt": " "}).status_code == 422
+    assert c.post("/v1/assistant/chat", headers=headers, json={"prompt": "x" * 8001}).status_code == 422
+    assert c.post("/v1/assistant/chat", headers=headers, json={"prompt": "hi", "shell": "no"}).status_code == 422
+    assert c.post("/v1/assistant/chat", headers=headers, json={"prompt": "hi", "mode": "magic"}).status_code == 422
