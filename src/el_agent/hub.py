@@ -297,3 +297,13 @@ def unpair_local() -> dict[str, object]:
         "device_id": credentials["device_id"] if credentials else (device_id_path().read_text(encoding="utf-8").strip() if device_id_path().exists() else None),
         "remote_revocation_required": credentials is not None,
     }
+
+
+def reset_device_id() -> dict[str, object]:
+    if credentials_path().exists():
+        raise HubClientError("Run unpair first; reset is blocked while local Hub credentials remain.")
+    path = device_id_path()
+    previous = path.read_text(encoding="utf-8").strip() if path.exists() else None
+    if path.exists():
+        path.unlink()
+    return {"previous_device_id": previous, "device_id": get_device_id(), "paired": False}
