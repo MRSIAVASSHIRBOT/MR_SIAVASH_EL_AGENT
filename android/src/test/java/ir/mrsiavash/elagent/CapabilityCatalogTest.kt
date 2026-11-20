@@ -42,4 +42,36 @@ class CapabilityCatalogTest {
         val allowed = CapabilityCatalog.evaluate(CapabilityId.ACCESSIBILITY_AUTOMATION, ActionEffect.LOCAL_CHANGE, ActionContext(appInForeground = true, accessibilityServiceEnabled = true))
         assertFalse(denied.allowed); assertTrue(allowed.allowed)
     }
+    @Test fun requiresConfirmationForLocalDataWrites() {
+        val withoutConfirmation = CapabilityCatalog.evaluate(
+            CapabilityId.SELECTED_FILE_WRITE,
+            ActionEffect.LOCAL_CHANGE,
+            ActionContext(appInForeground = true, resourceSelectedByUser = true)
+        )
+        val withConfirmation = CapabilityCatalog.evaluate(
+            CapabilityId.SELECTED_FILE_WRITE,
+            ActionEffect.LOCAL_CHANGE,
+            ActionContext(appInForeground = true, resourceSelectedByUser = true, explicitConfirmation = true)
+        )
+        assertFalse(withoutConfirmation.allowed)
+        assertTrue(withoutConfirmation.requiresConfirmation)
+        assertTrue(withConfirmation.allowed)
+    }
+
+    @Test fun requiresPermissionAndConfirmationForContactChanges() {
+        val permissionOnly = CapabilityCatalog.evaluate(
+            CapabilityId.CONTACTS_WRITE,
+            ActionEffect.LOCAL_CHANGE,
+            ActionContext(appInForeground = true, platformGrantGranted = true)
+        )
+        val fullyAuthorized = CapabilityCatalog.evaluate(
+            CapabilityId.CONTACTS_WRITE,
+            ActionEffect.LOCAL_CHANGE,
+            ActionContext(appInForeground = true, platformGrantGranted = true, explicitConfirmation = true)
+        )
+        assertFalse(permissionOnly.allowed)
+        assertTrue(permissionOnly.requiresConfirmation)
+        assertTrue(fullyAuthorized.allowed)
+    }
+
 }
