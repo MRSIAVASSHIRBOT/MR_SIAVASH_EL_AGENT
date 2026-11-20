@@ -62,7 +62,7 @@ class HubClient(private val store: SecureStore) {
         val accessTtl = result.optLong("expires_in", -1)
         val refreshTtl = result.optLong("refresh_expires_in", -1)
         require(access.length >= 40 && refresh.length >= 40) { "Hub returned malformed device credentials." }
-        require(accessTtl in 30..3600 && refreshTtl in 3600..(90L * 24 * 3600)) {
+        require(accessTtl in 30L..3600L && refreshTtl in 3600L..(90L * 24 * 3600)) {
             "Hub returned invalid credential lifetimes."
         }
         val scopes = result.optJSONArray("scopes") ?: throw IllegalStateException("Hub omitted granted scopes.")
@@ -86,28 +86,31 @@ class HubClient(private val store: SecureStore) {
         val saved = store.read()
         val hub = saved.getString("hub_url")
         val id = saved.getString("device_id")
-        if (saved.optLong("access_expires_at") > System.currentTimeMillis() + 60_000L) return saved
-        require(saved.optLong("refresh_expires_at") > System.currentTimeMillis()) {
-            "Refresh credential expired. Revoke this device in Hub and pair again."
+        if (saved.optLong("access_expires_at") > System.currentTimeMillis() + 60_000L) {
+            saved
+        } else {
+            require(saved.optLong("refresh_expires_at") > System.currentTimeMillis()) {
+                "Refresh credential expired. Revoke this device in Hub and pair again."
+            }
+            val refreshed = request(
+                hub, "/devices/refresh",
+                JSONObject().put("refresh_token", saved.getString("refresh_token")).put("device_id", id)
+            )
+            require(refreshed.optString("device_id") == id) { "Hub refresh returned a different device identity." }
+            val access = refreshed.optString("access_token")
+            val refresh = refreshed.optString("refresh_token")
+            val accessTtl = refreshed.optLong("expires_in", -1)
+            val refreshTtl = refreshed.optLong("refresh_expires_in", -1)
+            require(access.length >= 40 && refresh.length >= 40 && accessTtl in 30L..3600L && refreshTtl in 3600L..(90L * 24 * 3600)) {
+                "Hub returned invalid refreshed credentials."
+            }
+            saved.put("access_token", access)
+                .put("refresh_token", refresh)
+                .put("access_expires_at", System.currentTimeMillis() + accessTtl * 1000L)
+                .put("refresh_expires_at", System.currentTimeMillis() + refreshTtl * 1000L)
+            store.write(saved)
+            saved
         }
-        val refreshed = request(
-            hub, "/devices/refresh",
-            JSONObject().put("refresh_token", saved.getString("refresh_token")).put("device_id", id)
-        )
-        require(refreshed.optString("device_id") == id) { "Hub refresh returned a different device identity." }
-        val access = refreshed.optString("access_token")
-        val refresh = refreshed.optString("refresh_token")
-        val accessTtl = refreshed.optLong("expires_in", -1)
-        val refreshTtl = refreshed.optLong("refresh_expires_in", -1)
-        require(access.length >= 40 && refresh.length >= 40 && accessTtl in 30..3600 && refreshTtl in 3600..(90L * 24 * 3600)) {
-            "Hub returned invalid refreshed credentials."
-        }
-        saved.put("access_token", access)
-            .put("refresh_token", refresh)
-            .put("access_expires_at", System.currentTimeMillis() + accessTtl * 1000L)
-            .put("refresh_expires_at", System.currentTimeMillis() + refreshTtl * 1000L)
-        store.write(saved)
-        saved
     }
 
     fun heartbeat(): String {
