@@ -43,11 +43,15 @@ If you prefer manual installation:
 
 ## Run
 
-Keep the agent server running in one PowerShell window:
+Start the desktop control center (it starts the local API automatically if needed):
+
+    .\.venv\Scripts\el-agent.exe gui
+
+Or run the API separately without the GUI:
 
     .\.venv\Scripts\el-agent.exe serve
 
-In a second PowerShell window, run commands from the repository directory:
+In another PowerShell window, run commands from the repository directory:
 
     .\.venv\Scripts\el-agent.exe status
     .\.venv\Scripts\el-agent.exe screenshot
@@ -85,4 +89,4 @@ See docs/ROADMAP.md and docs/SECURITY.md. CI tests Windows and Linux with Python
 
 ## Status
 
-The Windows-first MVP is merged into main. The desktop control center and bounded Persian/English command grammar are being added in the next release. Automated CI is required on Windows and Ubuntu with Python 3.11 and 3.12; a clean Windows 11 installation and live screenshot/application-launch acceptance test are still required before calling desktop behavior verified. The scheduled ChatGPT shortcut opens ChatGPT only; sending prompts or automating a conversation is not implemented. Android, browser extension, Hub pairing, shared memory, and cloud scheduling remain planned.
+The Windows-first MVP is merged into main. The desktop control center and bounded Persian/English command grammar are implemented in the current development branch; they are not yet merged into main. Automated CI is required on Windows and Ubuntu with Python 3.11 and 3.12; a clean Windows 11 installation and live screenshot/application-launch acceptance test are still required before calling desktop behavior verified. The scheduled ChatGPT shortcut opens ChatGPT only; sending prompts or automating a conversation is not implemented. Android, browser extension, Hub pairing, shared memory, and cloud scheduling remain planned.
