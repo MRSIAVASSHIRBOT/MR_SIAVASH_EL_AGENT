@@ -85,7 +85,12 @@ class AgentPlanExecutionSession(
         )
     }
 
-    fun markCompleted(stepId: String, ownerVerified: Boolean = false, detail: String = "انجام شد") {
+    fun markCompleted(
+        stepId: String,
+        ownerVerified: Boolean = false,
+        resourceVerified: Boolean = false,
+        detail: String = "انجام شد"
+    ) {
         val step = plan.steps.firstOrNull { it.id == stepId }
             ?: throw IllegalArgumentException("Unknown plan step.")
         val current = record(stepId).state
@@ -100,6 +105,9 @@ class AgentPlanExecutionSession(
                 requireEarlierStepsCompleted(stepId)
                 require(step.operation == AgentOperation.READ_SELECTED_DOCUMENT) {
                     "Only selected-document work can complete after resource selection."
+                }
+                require(resourceVerified) {
+                    "A selected-document step requires verified Android read-grant evidence."
                 }
             }
             PlanStepState.DISPATCHED -> {
