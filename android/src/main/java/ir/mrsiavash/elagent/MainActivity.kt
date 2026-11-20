@@ -113,8 +113,9 @@ class MainActivity : Activity() {
                 text = label
                 textSize = 12f
                 isAllCaps = false
-                setPadding(2, 8, 2, 8)
-                minimumHeight = (48 * resources.displayMetrics.density).toInt()
+                val density = resources.displayMetrics.density
+                setPadding((4 * density).toInt(), (8 * density).toInt(), (4 * density).toInt(), (8 * density).toInt())
+                minimumHeight = (48 * density).toInt()
                 tag = "navigation"
                 setOnClickListener { selectPage(index) }
             }
@@ -392,8 +393,13 @@ class MainActivity : Activity() {
             text = "آماده‌به‌کار · منتظر فرمان شما"
             textSize = 14f
             setTextColor(Color.rgb(161, 174, 195))
-            setPadding(16, 18, 16, 18)
-            setBackgroundColor(Color.rgb(23, 32, 47))
+            val density = resources.displayMetrics.density
+            setPadding((16 * density).toInt(), (14 * density).toInt(), (16 * density).toInt(), (14 * density).toInt())
+            background = GradientDrawable().apply {
+                setColor(Color.rgb(23, 32, 47))
+                cornerRadius = (18 * density)
+                setStroke((1 * density).toInt(), Color.rgb(40, 53, 73))
+            }
         }
         root.addView(status, fieldParams())
         voiceController = LocalVoiceController(this, ::setStatus, ::handleVoiceTranscript, ::finishVoiceUi)
@@ -1002,7 +1008,7 @@ class MainActivity : Activity() {
     }
 
     private fun fieldParams() = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-        bottomMargin = 16
+        bottomMargin = (12 * resources.displayMetrics.density).toInt()
     }
     private fun buttonParams() = fieldParams()
     private fun setBusy(message: String) = runOnUiThread { status.text = message }
