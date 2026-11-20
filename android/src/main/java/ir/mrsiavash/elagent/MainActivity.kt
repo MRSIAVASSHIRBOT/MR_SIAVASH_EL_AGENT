@@ -470,7 +470,7 @@ class MainActivity : Activity() {
         walk(root)
     }
 
-    private fun generatePlan {
+    private fun generatePlan() {
         val requestText = plannerRequest.text.toString()
         if (requestText.isBlank() || requestText.length > 4_000) {
             setStatus("درخواست باید بین ۱ تا ۴۰۰۰ نویسه باشد.")
