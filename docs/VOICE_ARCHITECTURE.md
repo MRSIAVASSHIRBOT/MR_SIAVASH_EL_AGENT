@@ -1,6 +1,6 @@
 # Voice Intelligence Architecture
 
-**Status:** Approved product direction; design only. No voice runtime is implemented by this document.
+**Status:** Approved hybrid product direction. Windows push-to-talk is implemented in main; Android foreground push-to-talk is implemented in PR #6. Automated CI and real-device acceptance are tracked separately.
 
 ## Product decisions
 
@@ -93,15 +93,17 @@ Do not add message sending, purchases, account changes, file deletion, or remote
 
 ## Delivery phases
 
-### V0 — Voice foundations (design complete; implementation pending)
+### V0 — Voice foundations (design approved; shared contract implementation remains pending)
 - Shared action schema and policy matrix.
 - Provider interfaces for wake word, STT, TTS, and inference.
 - Threat model, privacy notice, permission UX, and test fixtures.
 
 ### V1 — Push-to-talk assistant
-- Foreground microphone button; no background listening.
-- Local-first STT where viable, typed intent resolution, TTS response.
-- Initial safe actions: app open, device status, local reminder.
+- [x] Windows foreground push-to-talk with local Vosk STT, bounded capture, deterministic allowlist, and local system TTS (CI passed; physical acceptance pending).
+- [x] Android foreground push-to-talk prototype using Android's on-device recognizer only, runtime microphone permission, and ChatGPT/browser allowlist (Android 12+; physical acceptance pending).
+- [x] Android local Persian TTS only when an offline Persian system voice exists; otherwise text fallback.
+- [ ] Shared versioned typed action schema and common policy engine across platforms.
+- [ ] Expand the safe action catalog only after platform-specific tests and permission review.
 
 ### V2 — Wake word «سیا»
 - Opt-in local keyword spotting.
