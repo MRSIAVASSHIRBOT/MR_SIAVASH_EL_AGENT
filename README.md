@@ -80,7 +80,7 @@ Quick setup check:
 
 The wake word «سیا» and optional cloud reasoning remain later phases.
 
-## Pair with MR_SIAVASH_HUB_AI (heartbeat scope only)
+## Pair with MR_SIAVASH_HUB_AI (least-privilege device scopes)
 
 The Hub API must be deployed and reachable over HTTPS (HTTP is accepted only for localhost). Pairing is owner-initiated and the one-time code expires after five minutes.
 
@@ -112,7 +112,7 @@ The Hub API must be deployed and reachable over HTTPS (HTTP is accepted only for
 
        .\.venv\Scripts\el-agent.exe hub-status
 
-On Windows, Hub credentials are stored in Windows Credential Manager through the packaged Windows keyring backend. Existing legacy JSON credentials are migrated into the vault on first read and the plaintext file is removed only after a successful vault write. If a trusted Windows vault backend is unavailable, pairing and task polling fail closed. On non-Windows development environments, the private JSON adapter remains available for tests. Once paired, the local Agent sends minimal heartbeat metadata and polls the Hub task queue. The Hub task-dispatch API is merged to Hub main but must be deployed before live task execution. The consumer executes only the exact granted scope: allowlisted app.launch, or screen.capture when the task carries explicit owner confirmation. Captured screenshots remain local and are not uploaded. The Hub records device-reported outcomes as unverified; an expired claim is never replayed automatically.
+On Windows, Hub credentials are stored in Windows Credential Manager through the packaged Windows keyring backend. Existing legacy JSON credentials are migrated into the vault on first read and the plaintext file is removed only after a successful vault write. If a trusted Windows vault backend is unavailable, pairing and task polling fail closed. On non-Windows development environments, the private JSON adapter remains available for tests. For Windows, the owner may grant `app.launch` and `screen.capture` in addition to `device.heartbeat`; screenshot tasks still require explicit per-task owner confirmation. For Android, grant only `device.heartbeat` and `app.launch` because Android screenshot capture is not implemented. Once paired, the local Agent sends minimal heartbeat metadata and polls the Hub task queue. The Hub task-dispatch API is merged to Hub main but must be deployed before live task execution. The consumer executes only the exact granted scope: allowlisted app.launch, or screen.capture when the task carries explicit owner confirmation. Captured screenshots remain local and are not uploaded. The Hub records device-reported outcomes as unverified; an expired claim is never replayed automatically.
 
 To disconnect, run el-agent unpair to remove local credentials, then revoke the device from the Hub owner device registry using DELETE /devices/{device_id}. Local unpairing alone does not revoke the Hub-side device record. If you later need to pair this installation again after revocation, run el-agent reset-device-id and type RESET; this creates a new device identity without changing any existing Hub audit history.
 
