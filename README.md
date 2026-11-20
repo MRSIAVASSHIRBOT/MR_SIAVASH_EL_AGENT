@@ -1,8 +1,8 @@
 # MR_SIAVASH_EL_AGENT
 
-**Personal Digital Operator — Windows-first local MVP**
+**Personal Digital Operator — Windows + Android companion MVP**
 
-A device-side companion for the MR_SIAVASH ecosystem. This release provides a local Windows API, CLI, and a Tk desktop control center for explicit screenshot capture, allowlisted application launch, Persian/English quick commands, and scheduled application launch.
+A device-side companion for the MR_SIAVASH ecosystem. Windows provides a local API, CLI, and desktop control center. Android provides a native companion app with secure Hub pairing, encrypted credential storage backed by Android Keystore, heartbeat sync, allowlisted app launch, and owner-authorized task notifications that require an explicit user tap.
 
 ## What works in this MVP
 
@@ -114,6 +114,33 @@ Remove that startup task at any time with:
 
 This startup option runs the loopback-only API in the background; it does not enable remote access. The API documentation is available locally at http://127.0.0.1:8765/docs.
 
+
+## Android companion (version 0.3.0)
+
+The native Android app is in `app/`. Open the repository in Android Studio, allow Gradle sync, then run the `app` configuration on an Android 8.0+ device. A debug APK can also be built with:
+
+```bash
+gradle --no-daemon :app:assembleDebug
+```
+
+The app currently supports:
+- Stable Android device identity and owner-initiated Hub pairing.
+- Android Keystore AES-GCM encryption for Hub access/refresh credentials.
+- HTTPS-only Hub communication, short-lived access tokens, and refresh-token rotation.
+- A manually started foreground sync service with a persistent Android notification and minimal 60-second heartbeat.
+- Local opening of the installed calculator/browser and the fixed official ChatGPT URL.
+- When the Hub task-dispatch API is available and the owner explicitly grants `app.launch`, incoming app-launch tasks appear as notifications. The user must tap the notification and confirm before the Android app is opened; background activity launches are not attempted.
+
+Pairing is owner-controlled. Copy the pairing JSON shown in the Android app and use the authenticated Hub owner session to create a five-minute challenge. Keep the granted scopes to `device.heartbeat` and, only when remote allowlisted app launching is wanted, `app.launch`. The Android app never stores the Hub owner's bearer token.
+
+Android limitations in this first native milestone:
+- Screenshot capture is not enabled; Android requires a separate user-approved MediaProjection session.
+- Background app launches are blocked by Android policy; remote requests therefore require a visible notification and a user confirmation tap.
+- The service runs only after the user starts it and while Android permits the foreground service to run. Battery optimization and vendor background limits may affect uptime.
+- Local scheduled launches, shared memory, and broad UI automation are not included.
+
+To disconnect, use **قطع اتصال محلی** in the app, then revoke the device from the Hub owner device registry. Clearing local credentials alone does not revoke the Hub-side device.
+
 ## Security boundaries
 
 - The local API is loopback-only; no inbound remote-control transport or remote task dispatch is implemented. Optional outbound Hub heartbeat is limited to minimal device health metadata.
@@ -133,4 +160,4 @@ See docs/ROADMAP.md and docs/SECURITY.md. CI tests Windows and Linux with Python
 
 ## Status
 
-Version 0.2.0 adds owner-initiated Hub pairing, rotating scoped device credentials, and an outbound heartbeat containing only device ID, agent version, runtime state, and uptime. A clean Windows 11 installation and live screenshot/application-launch acceptance test are still required before calling desktop behavior verified. The scheduled ChatGPT shortcut opens ChatGPT only; sending prompts or automating a conversation is not implemented. Remote task dispatch, shared memory, Android, browser extension, and cloud scheduling remain planned.
+Version 0.2.0 adds owner-initiated Hub pairing, rotating scoped device credentials, and an outbound heartbeat containing only device ID, agent version, runtime state, and uptime. A clean Windows 11 installation and live screenshot/application-launch acceptance test are still required before calling desktop behavior verified. The scheduled ChatGPT shortcut opens ChatGPT only; sending prompts or automating a conversation is not implemented. Remote task dispatch is being integrated against the Hub's owner-scoped task API; Android notifications require user confirmation. Shared memory, Android screenshot capture, browser extension, and cloud scheduling remain planned.
