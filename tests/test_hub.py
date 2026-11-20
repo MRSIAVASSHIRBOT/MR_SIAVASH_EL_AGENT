@@ -394,3 +394,40 @@ def test_windows_vault_save_preserves_invalid_legacy_file(tmp_path, monkeypatch)
 
     assert legacy.exists(), "invalid legacy data must be preserved for manual recovery"
     assert json.loads(fake_vault[(credential_store.SERVICE_NAME, credential_store.CREDENTIAL_USERNAME)]) == credentials
+
+
+def test_windows_device_id_reset_is_blocked_while_vault_credentials_exist(tmp_path, monkeypatch):
+    from el_agent import credential_store
+
+    _use_tmp_data_dir(monkeypatch, tmp_path)
+    fake_vault = {}
+
+    class FakeKeyring:
+        def get_password(self, service, username):
+            return fake_vault.get((service, username))
+
+        def set_password(self, service, username, password):
+            fake_vault[(service, username)] = password
+
+        def delete_password(self, service, username):
+            fake_vault.pop((service, username), None)
+
+    monkeypatch.setattr(hub.platform, "system", lambda: "Windows")
+    monkeypatch.setattr(credential_store, "_windows_keyring", lambda: FakeKeyring())
+    now = datetime.now(timezone.utc)
+    credentials = {
+        "hub_url": "https://hub.example.test",
+        "device_id": hub.get_device_id(),
+        "access_token": _token("a"),
+        "refresh_token": _token("r"),
+        "access_expires_at": (now + timedelta(minutes=10)).isoformat(),
+        "refresh_expires_at": (now + timedelta(days=10)).isoformat(),
+        "scopes": ["device.heartbeat"],
+    }
+    credential_store.save_credentials(credentials)
+
+    with pytest.raises(hub.HubClientError, match="Run unpair first"):
+        hub.reset_device_id()
+
+    assert hub.get_device_id() == credentials["device_id"]
+    assert credential_store.load_credentials() == credentials
