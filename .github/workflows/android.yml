@@ -1,7 +1,7 @@
 name: Android
 on:
   push:
-    branches: [main, "feat/**"]
+    branches: [main]
     paths:
       - "android/**"
       - "*.gradle.kts"
@@ -21,7 +21,7 @@ on:
       - ".github/workflows/android.yml"
   workflow_dispatch:
 concurrency:
-  group: android-${{ github.workflow }}-${{ github.ref }}
+  group: android-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 permissions:
   contents: read
