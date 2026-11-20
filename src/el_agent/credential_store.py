@@ -26,9 +26,15 @@ def _windows_keyring():
             "Windows Credential Manager support is unavailable; install the packaged keyring dependency."
         ) from exc
 
+    try:
+        from keyring.backends.Windows import WinVaultKeyring
+    except ImportError as exc:
+        raise CredentialStoreError(
+            "The trusted Windows Credential Manager backend is unavailable."
+        ) from exc
+
     backend = keyring.get_keyring()
-    backend_name = type(backend).__name__
-    if "WinVault" not in backend_name and "Windows" not in backend_name:
+    if not isinstance(backend, WinVaultKeyring):
         raise CredentialStoreError(
             "No trusted Windows Credential Manager backend is active; credentials were not written."
         )
@@ -70,10 +76,11 @@ def delete_credentials() -> None:
     if platform.system() == "Windows":
         keyring = _windows_keyring()
         try:
-            keyring.delete_password(SERVICE_NAME, CREDENTIAL_USERNAME)
+            # Check first so an already-unpaired device remains idempotent
+            # without relying on backend-specific exception message text.
+            if keyring.get_password(SERVICE_NAME, CREDENTIAL_USERNAME) is not None:
+                keyring.delete_password(SERVICE_NAME, CREDENTIAL_USERNAME)
         except Exception as exc:
-            # keyring's backend raises when the entry does not exist. Unpair is idempotent.
-            if "not found" not in str(exc).lower() and "no password" not in str(exc).lower():
-                raise CredentialStoreError("Could not delete Hub credentials from Windows Credential Manager.") from exc
+            raise CredentialStoreError("Could not delete Hub credentials from Windows Credential Manager.") from exc
         return
     raise CredentialStoreError("File-backed credential storage must be handled by the non-Windows development adapter.")
