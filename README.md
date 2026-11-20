@@ -102,7 +102,7 @@ The Hub API must be deployed and reachable over HTTPS (HTTP is accepted only for
 
 Once paired, the local Agent sends a minimal heartbeat when its API starts. Only the device ID, agent version, runtime state, and uptime are sent. The first release does not accept remote tasks or access screenshots/files through Hub.
 
-To disconnect, run el-agent unpair to remove local credentials, then revoke the device from the Hub owner device registry using DELETE /devices/{device_id}. Local unpairing alone does not revoke the Hub-side device record.
+To disconnect, run el-agent unpair to remove local credentials, then revoke the device from the Hub owner device registry using DELETE /devices/{device_id}. Local unpairing alone does not revoke the Hub-side device record. If you later need to pair this installation again after revocation, run el-agent reset-device-id and type RESET; this creates a new device identity without changing any existing Hub audit history.
 
 Optional: start the local Agent automatically after this Windows user signs in (no administrator elevation required):
 
