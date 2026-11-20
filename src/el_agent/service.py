@@ -20,15 +20,38 @@ def task_store() -> TaskStore:
     return TaskStore(data_dir() / "tasks.sqlite3")
 
 async def scheduler_loop(store: TaskStore) -> None:
+    # A process restart cannot prove whether a previously claimed launch took
+    # effect. Fence those rows as unknown instead of replaying them.
+    try:
+        recovered = await asyncio.to_thread(store.reconcile_interrupted)
+        if recovered:
+            logger.warning(
+                "Local scheduler reconciled %s interrupted task(s) as unknown_outcome; none were replayed.",
+                recovered,
+            )
+    except Exception:
+        logger.exception("Local scheduler startup recovery failed")
+
     while True:
         try:
-            for task in store.claim_due(datetime.now(timezone.utc)):
+            due_tasks = await asyncio.to_thread(store.claim_due, datetime.now(timezone.utc))
+            for task in due_tasks:
                 try:
-                    launch_app(task["app_alias"])
-                    store.finish(task["task_id"])
+                    await asyncio.to_thread(launch_app, task["app_alias"])
+                    await asyncio.to_thread(store.finish, task["task_id"])
+                except asyncio.CancelledError:
+                    # Leave the row running. On the next process start, recovery
+                    # will classify the outcome as unknown rather than replay it.
+                    raise
                 except Exception as exc:
                     logger.exception("Scheduled task failed: %s", task["task_id"])
-                    store.finish(task["task_id"], type(exc).__name__ + ": " + str(exc))
+                    await asyncio.to_thread(
+                        store.finish,
+                        task["task_id"],
+                        type(exc).__name__ + ": " + str(exc),
+                    )
+        except asyncio.CancelledError:
+            raise
         except Exception:
             logger.exception("Scheduler iteration failed")
         await asyncio.sleep(1)
