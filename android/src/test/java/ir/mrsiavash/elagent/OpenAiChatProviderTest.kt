@@ -67,7 +67,14 @@ class OpenAiChatProviderTest {
         assertEquals("system", messages.getJSONObject(0).getString("role"))
         assertEquals("system constraints", messages.getJSONObject(0).getString("content"))
         assertEquals("user", messages.getJSONObject(1).getString("role"))
-        assertEquals("json_object", payload.getJSONObject("response_format").getString("type"))
+        val responseFormat = payload.getJSONObject("response_format")
+        assertEquals("json_schema", responseFormat.getString("type"))
+        val schemaConfig = responseFormat.getJSONObject("json_schema")
+        assertEquals("android_agent_plan_v1", schemaConfig.getString("name"))
+        assertTrue(schemaConfig.getBoolean("strict"))
+        val schema = schemaConfig.getJSONObject("schema")
+        assertEquals(false, schema.getBoolean("additionalProperties"))
+        assertTrue(schema.getJSONArray("required").toString().contains("steps"))
     }
 
     @Test fun refusesRedirectsWithoutForwardingCredential() {
