@@ -10,6 +10,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.content.pm.PackageManager
 import android.os.Build
+import android.provider.ContactsContract
 import android.view.ViewGroup
 import android.widget.Button
 import android.text.InputType
@@ -30,12 +31,17 @@ class MainActivity : Activity() {
     private val plannerExecutor = Executors.newSingleThreadExecutor()
     private lateinit var store: SecureStore
     private lateinit var status: TextView
+    private lateinit var fatherContactStatus: TextView
     private lateinit var hubUrl: EditText
     private lateinit var pairingCode: EditText
     private lateinit var voiceController: LocalVoiceController
     private lateinit var voiceButton: Button
     private var voiceActive = false
     private val recordAudioRequest = 4102
+    private val fatherContactRequest = 4105
+    private val callPhoneRequest = 4106
+    private var pendingCallAfterContactSelection = false
+    private var pendingCallAfterPermission = false
     private val openDocumentRequest = 4103
     private lateinit var documentPreview: TextView
     private lateinit var plannerRequest: EditText
@@ -553,6 +559,39 @@ class MainActivity : Activity() {
     @Suppress("DEPRECATION")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == fatherContactRequest) {
+            val selectedUri = if (resultCode == RESULT_OK) data?.data else null
+            if (selectedUri == null) {
+                pendingCallAfterContactSelection = false
+                setStatus("انتخاب مخاطب لغو شد؛ تماسی برقرار نشد.")
+                return
+            }
+            val selected = runCatching {
+                contentResolver.query(
+                    selectedUri,
+                    arrayOf(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME, ContactsContract.CommonDataKinds.Phone.NUMBER),
+                    null, null, null
+                )?.use { cursor ->
+                    if (!cursor.moveToFirst()) null else {
+                        val name = cursor.getString(0).orEmpty()
+                        val number = cursor.getString(1).orEmpty().filter { it.isDigit() || it == '+' }
+                        if (number.length !in 3..20) null else name to number
+                    }
+                }
+            }.getOrNull()
+            if (selected == null) {
+                pendingCallAfterContactSelection = false
+                setStatus("شمارهٔ معتبر از مخاطب انتخاب‌شده دریافت نشد.")
+                return
+            }
+            store.saveFatherContact(selected.first, selected.second)
+            if (::fatherContactStatus.isInitialized) fatherContactStatus.text = fatherContactSummary()
+            val shouldCall = pendingCallAfterContactSelection
+            pendingCallAfterContactSelection = false
+            setStatus("مخاطب پدر به‌صورت رمزگذاری‌شده ذخیره شد.")
+            if (shouldCall) placeFatherCall()
+            return
+        }
         if (requestCode == executionDocumentRequest) {
             handlePlanDocumentResult(resultCode, data)
             return
@@ -611,6 +650,17 @@ class MainActivity : Activity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == callPhoneRequest) {
+            val granted = grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED
+            val shouldCall = pendingCallAfterPermission
+            pendingCallAfterPermission = false
+            if (granted && shouldCall) placeFatherCall()
+            else if (!granted) {
+                setStatus("مجوز تماس تلفنی صادر نشد؛ هیچ تماسی برقرار نشد.")
+                voiceController.speak("مجوز تماس تلفنی صادر نشد.")
+            }
+            return
+        }
         if (requestCode == recordAudioRequest) {
             if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) beginVoice()
             else setStatus("مجوز میکروفون داده نشد؛ قابلیت صوتی غیرفعال ماند.")
@@ -636,6 +686,15 @@ class MainActivity : Activity() {
             voiceController.speak(message)
             return
         }
+        if (alias == "call_father") {
+            runCatching { placeFatherCall() }
+                .onFailure {
+                    val message = "برقراری تماس ناموفق بود: " + (it.message ?: "خطای نامشخص")
+                    setStatus(message)
+                    voiceController.speak(message)
+                }
+            return
+        }
         runCatching { launchAllowlisted(alias) }
             .onSuccess {
                 val message = if (alias == "chatgpt") "ChatGPT باز شد." else "مرورگر باز شد."
@@ -647,6 +706,41 @@ class MainActivity : Activity() {
                 setStatus(message)
                 voiceController.speak(message)
             }
+    }
+
+    private fun chooseFatherContact(forImmediateCall: Boolean = false) {
+        pendingCallAfterContactSelection = forImmediateCall
+        val picker = Intent(Intent.ACTION_PICK, ContactsContract.CommonDataKinds.Phone.CONTENT_URI)
+        startActivityForResult(picker, fatherContactRequest)
+    }
+
+    private fun fatherContactSummary(): String {
+        val name = store.fatherContactName()
+        return if (name.isBlank()) {
+            "مخاطب پدر هنوز انتخاب نشده است. یک‌بار از فهرست مخاطبین انتخابش کن."
+        } else {
+            "مخاطب تماس سریع: $name  ·  شماره در حافظهٔ رمزگذاری‌شده نگهداری می‌شود."
+        }
+    }
+
+    /** Places a call immediately after the explicit voice command and Android permission grant. */
+    private fun placeFatherCall() {
+        val number = store.fatherContactPhone()
+        if (number.isBlank()) {
+            setStatus("برای تماس مستقیم، ابتدا مخاطب پدر را انتخاب کن.")
+            voiceController.speak("مخاطب پدر هنوز انتخاب نشده. لطفاً یک‌بار آن را انتخاب کن.")
+            chooseFatherContact(forImmediateCall = true)
+            return
+        }
+        if (checkSelfPermission(Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
+            pendingCallAfterPermission = true
+            requestPermissions(arrayOf(Manifest.permission.CALL_PHONE), callPhoneRequest)
+            setStatus("برای تماس مستقیم، مجوز تماس Android لازم است.")
+            return
+        }
+        startActivity(Intent(Intent.ACTION_CALL, Uri.fromParts("tel", number, null)))
+        setStatus("در حال تماس با ${store.fatherContactName().ifBlank { "پدر" }}…")
+        voiceController.speak("در حال تماس با پدر.")
     }
 
     private fun launchAllowlisted(alias: String) {
@@ -713,6 +807,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         activityInForeground = true
+        if (::fatherContactStatus.isInitialized) fatherContactStatus.text = fatherContactSummary()
         updateExecutionUi()
     }
 
