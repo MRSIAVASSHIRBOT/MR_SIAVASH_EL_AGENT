@@ -4,9 +4,8 @@ The Android planner uses a zero-cost-first provider chain. It never sends planne
 
 ## Default order
 
-1. Google Gemini API — `gemini-4-hydrogen` (free-tier model; availability and quotas depend on the Google AI Studio project).
-2. Groq API — `openai/gpt-oss-20b` (free developer-tier quota; account/model limits apply).
-3. OpenRouter — `openrouter/free` (free-model router; OpenRouter currently documents 20 requests/minute and 50 requests/day for free models).
+1. Google Gemini API — `gemini-4-hydrogen` (the model has a Free-tier price of $0; the Google AI Studio project itself must remain on the Free tier with billing disabled).
+2. OpenRouter — `openrouter/free` (routes to a $0 model; the Free plan currently documents 20 requests/minute and 50 requests/day for free model variants).
 
 The provider order is deterministic. Only providers with a locally saved key are attempted. The first valid JSON response wins; the app validates it locally with AgentPlanParser before creating an execution session.
 
@@ -14,7 +13,8 @@ The provider order is deterministic. Only providers with a locally saved key are
 
 - No paid fallback exists.
 - OpenRouter is restricted to `openrouter/free` by default; the provider adapter rejects model IDs without the free marker.
-- Gemini uses a model documented as free-tier; Groq uses its free developer-tier quota. A provider's pricing and account plan can change, so owners must verify their account remains on the free tier.
+- Gemini is attempted only with the fixed model documented as $0 on the Free tier. The app cannot inspect the Google project's billing tier; the owner must keep that project on Free tier and leave billing disabled. If billing is enabled, this app cannot guarantee zero cost for Gemini.
+- Groq is intentionally excluded from this zero-cost chain: the currently documented `openai/gpt-oss-20b` model has per-token pricing on Groq's model catalog, so including it would violate the zero-cost priority.
 - The old OpenAI key is preserved for compatibility but is not used by this free-only planner.
 - The app does not upgrade provider plans, buy credits, or create billing resources.
 - API keys are stored in the existing Android Keystore AES-GCM encrypted payload. Keys are never written to source code or logs.
@@ -35,10 +35,9 @@ The provider order is deterministic. Only providers with a locally saved key are
 Create keys from the provider's official console, then enter each key in the Android app and tap its matching secure-save button:
 
 - Gemini: https://aistudio.google.com/
-- Groq: https://console.groq.com/
 - OpenRouter: https://openrouter.ai/
 
-A key is optional. Configure one or more providers. If no key is saved, the planner reports that no free provider is configured. Free tiers are quota-limited and are not an availability guarantee.
+A key is optional. Configure one or both providers. If no key is saved, the planner reports that no free provider is configured. Free tiers are quota-limited and are not an availability guarantee.
 
 ## Data and terms
 
