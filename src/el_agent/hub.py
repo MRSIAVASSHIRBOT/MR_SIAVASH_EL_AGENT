@@ -118,7 +118,8 @@ def _validated_tokens(result: dict[str, object]) -> dict[str, object]:
         or not isinstance(access_ttl, int) or not 30 <= access_ttl <= 3600
         or not isinstance(refresh_ttl, int) or not 3600 <= refresh_ttl <= 90 * 24 * 3600
         or not isinstance(scopes, list) or not all(isinstance(scope, str) for scope in scopes)
-        or set(scopes) != {"device.heartbeat"}
+        or not {"device.heartbeat"}.issubset(set(scopes))
+        or not set(scopes).issubset({"device.heartbeat", "app.launch", "screen.capture"})
     ):
         raise HubClientError("Hub returned invalid device credentials.")
     now = datetime.now(timezone.utc)
@@ -171,8 +172,12 @@ def load_credentials() -> dict[str, object] | None:
             raise ValueError("Access credential is invalid.")
         if not isinstance(result["refresh_token"], str) or len(result["refresh_token"]) < 40:
             raise ValueError("Refresh credential is invalid.")
-        if result["scopes"] != ["device.heartbeat"]:
-            raise ValueError("Stored scope is not heartbeat-only.")
+        if (
+            not isinstance(result["scopes"], list)
+            or not {"device.heartbeat"}.issubset(set(result["scopes"]))
+            or not set(result["scopes"]).issubset({"device.heartbeat", "app.launch", "screen.capture"})
+        ):
+            raise ValueError("Stored device scopes are invalid.")
         access_expiry = datetime.fromisoformat(str(result["access_expires_at"]))
         refresh_expiry = datetime.fromisoformat(str(result["refresh_expires_at"]))
         if access_expiry.tzinfo is None or refresh_expiry.tzinfo is None:
