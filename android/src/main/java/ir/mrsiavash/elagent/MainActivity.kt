@@ -139,7 +139,7 @@ class MainActivity : Activity() {
             setTextColor(Color.rgb(232, 245, 239))
         })
         root.addView(TextView(this).apply {
-            text = "Android companion · v0.5.0"
+            text = "Android companion · v0.6.0"
             textSize = 14f
             setTextColor(Color.rgb(168, 196, 183))
         })
@@ -222,6 +222,14 @@ class MainActivity : Activity() {
             setOnClickListener { toggleVoice() }
         }
         root.addView(voiceButton, buttonParams())
+        root.addView(Button(this).apply {
+            text = "📞  تماس سریع با پدر"
+            textSize = 15f
+            isAllCaps = false
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(13, 43, 30))
+            setTextColor(Color.rgb(88, 218, 165))
+            setOnClickListener { placeFatherCall() }
+        }, buttonParams())
         root.addView(TextView(this).apply {
             text = "برای فرمان صوتی، دکمه را بزن و بعد از شنیدن صدای آماده‌باش صحبت کن. تشخیص گفتار فعلاً با موتور آفلاین Android انجام می‌شود."
             textSize = 12f
