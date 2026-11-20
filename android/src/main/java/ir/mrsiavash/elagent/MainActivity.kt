@@ -692,7 +692,7 @@ class MainActivity : Activity() {
                     null, null, null
                 )?.use { cursor ->
                     if (!cursor.moveToFirst()) null else {
-                        val name = cursor.getString(0).orEmpty()
+                        val name = cursor.getString(0).orEmpty().ifBlank { "پدر" }
                         val number = cursor.getString(1).orEmpty().filter { it.isDigit() || it == '+' }
                         if (number.length !in 3..20) null else name to number
                     }
@@ -763,7 +763,7 @@ class MainActivity : Activity() {
 
     private fun beginVoice() {
         voiceActive = voiceController.start()
-        voiceButton.text = if (voiceActive) "توقف فرمان صوتی" else "شروع فرمان صوتی (محلی)"
+        voiceButton.text = if (voiceActive) "توقف فرمان صوتی" else "🎙  صحبت با سیا"
         if (!voiceActive) setStatus("تشخیص گفتار محلی در دسترس نیست؛ هیچ صدایی به Cloud ارسال نشد.")
     }
 
@@ -790,7 +790,7 @@ class MainActivity : Activity() {
         voiceActive = false
         if (::voiceButton.isInitialized) {
             voiceButton.isEnabled = true
-            voiceButton.text = "شروع فرمان صوتی (محلی)"
+            voiceButton.text = "🎙  صحبت با سیا"
         }
     }
 
@@ -830,7 +830,11 @@ class MainActivity : Activity() {
     private fun chooseFatherContact(forImmediateCall: Boolean = false) {
         pendingCallAfterContactSelection = forImmediateCall
         val picker = Intent(Intent.ACTION_PICK, ContactsContract.CommonDataKinds.Phone.CONTENT_URI)
-        startActivityForResult(picker, fatherContactRequest)
+        runCatching { startActivityForResult(picker, fatherContactRequest) }
+            .onFailure {
+                pendingCallAfterContactSelection = false
+                setStatus("انتخاب‌گر مخاطبین در این دستگاه در دسترس نیست.")
+            }
     }
 
     private fun fatherContactSummary(): String {
@@ -857,9 +861,14 @@ class MainActivity : Activity() {
             setStatus("برای تماس مستقیم، مجوز تماس Android لازم است.")
             return
         }
-        startActivity(Intent(Intent.ACTION_CALL, Uri.fromParts("tel", number, null)))
-        setStatus("در حال تماس با ${store.fatherContactName().ifBlank { "پدر" }}…")
-        voiceController.speak("در حال تماس با پدر.")
+        runCatching {
+            startActivity(Intent(Intent.ACTION_CALL, Uri.fromParts("tel", number, null)))
+        }.onSuccess {
+            setStatus("در حال تماس با ${store.fatherContactName().ifBlank { "پدر" }}…")
+            voiceController.speak("در حال تماس با پدر.")
+        }.onFailure {
+            setStatus("برنامهٔ تماس تلفنی در دسترس نیست: ${it.message ?: "خطای نامشخص"}")
+        }
     }
 
     private fun launchAllowlisted(alias: String) {
