@@ -29,3 +29,25 @@ def test_cli_ask_rejects_unknown_commands_without_api_call(monkeypatch):
         cli.main()
     assert exc.value.code == 1
     assert calls == []
+
+
+def test_cli_pair_prompts_for_code_without_command_line_secret(monkeypatch, capsys):
+    calls = []
+    monkeypatch.setattr(cli.getpass, "getpass", lambda _prompt: "p" * 48)
+    monkeypatch.setattr(cli, "pair_device", lambda url, code: calls.append((url, code)) or {"paired": True, "scopes": ["device.heartbeat"]})
+    monkeypatch.setattr(sys, "argv", ["el-agent", "pair", "--hub-url", "https://hub.example.test"])
+    cli.main()
+    assert calls == [("https://hub.example.test", "p" * 48)]
+    output = capsys.readouterr().out
+    assert "paired" in output
+    assert "pppp" not in output
+
+
+def test_cli_unpair_warns_that_hub_revocation_is_separate(monkeypatch, capsys):
+    monkeypatch.setattr(cli, "unpair_local", lambda: {
+        "paired": False, "device_id": "device-id", "remote_revocation_required": True
+    })
+    monkeypatch.setattr(sys, "argv", ["el-agent", "unpair"])
+    cli.main()
+    captured = capsys.readouterr()
+    assert "Revoke this device in the Hub" in captured.err
