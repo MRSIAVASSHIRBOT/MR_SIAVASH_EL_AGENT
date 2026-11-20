@@ -21,7 +21,7 @@ Build a general-purpose Android assistant that can plan and request diverse devi
 - PDF, images, arbitrary binary formats, and write access are not implemented in this slice.
 - File contents remain local. No automatic upload, cloud prompt inclusion, or Hub transfer exists.
 
-The adapter is a reusable platform component. Wiring it into MainActivity's UI and the planner is a separate integration step after the provider and Hub branches are reconciled.
+The adapter is wired to both the standalone file preview and the reviewed planner flow. Planner document steps open the system picker only after owner confirmation, then require an actual read URI grant before any bytes are read.
 
 ## Policy rules
 - A model response is never executable code; it is parsed into typed action requests.
@@ -57,4 +57,4 @@ JVM tests cover policy decisions and text-preview policy. Android CI must valida
 
 The Android 0.4.0 planning panel sends only the user-entered text request after an explicit tap. The API key is stored in the AES-GCM encrypted SecureStore payload. The provider is pinned to the official OpenAI HTTPS endpoint and refuses redirects. Structured Outputs uses a strict JSON Schema, then AgentPlanParser independently enforces the app's operation allowlist, limits, HTTPS URL policy, unique identifiers, and backward-only dependency references.
 
-The supported plan operations are limited to fixed app aliases, HTTPS browser navigation, user-selected document reading, and displaying plain text. A generated plan is a proposal only: the app does not execute any step from model output. File contents, microphone audio, screenshots, memory, and Hub credentials are not included in planner requests.
+The supported plan operations are limited to fixed app aliases, HTTPS browser navigation, user-selected document reading, and displaying plain text. Every step has a session-scoped action ID, must be reviewed individually, and is passed through the capability policy before the adapter runs. External intents are recorded as dispatched rather than complete; the owner must return and acknowledge the result before the next step is unlocked. Document access requires the picker result's read grant. Failed steps stop the plan, and the volatile execution ledger is not replayed after process restart. File contents, microphone audio, screenshots, memory, and Hub credentials are not included in planner requests.
