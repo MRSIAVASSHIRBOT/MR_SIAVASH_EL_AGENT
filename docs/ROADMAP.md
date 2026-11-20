@@ -17,7 +17,9 @@
 - [x] Owner-initiated single-use device pairing
 - [x] Short-lived scoped credentials, device registry, and revocation
 - [x] Outbound heartbeat and Hub audit correlation
-- [x] Windows Hub task consumer for allowlisted app.launch and explicitly owner-confirmed screen.capture (consumer tests added; integration remains gated on Hub PR #460 merge/deployment)
+- [x] Windows Hub task consumer for allowlisted app.launch and explicitly owner-confirmed screen.capture (consumer tests added; live acceptance pending Hub deployment)
+- [x] Windows Credential Manager storage with fail-closed backend validation and one-time legacy JSON migration
+- [ ] Live Hub pairing with action scopes, task round-trip, and revocation acceptance
 - [ ] Hub-issued task dispatch live acceptance with expiry, idempotency, cancellation, and outcome reconciliation
 - [ ] Shared memory through Hub APIs only
 
@@ -46,7 +48,7 @@ No item is complete until code, tests, privacy review, and platform acceptance e
 
 | Phase | Current evidence | Remaining acceptance gate |
 |---|---|---|
-| 1. Core integration | Hub pairing, stable device identity, heartbeat, owner-scoped task contract on Hub PR #460, scoped consumer client on this branch | Merge/deploy Hub task API; live owner pairing with least-privilege scopes; verify revocation and task audit |
+| 1. Core integration | Hub pairing, stable device identity, heartbeat, owner-scoped task contract on Hub PR #460, scoped consumer client on this branch | Deploy merged Hub task API; live owner pairing with least-privilege scopes; verify revocation and task audit |
 | 2. Windows Agent | Loopback API, bearer auth, explicit screenshot, allowlisted app launch, desktop UI, local scheduler, Hub task consumer implementation | Clean Windows 11 install, real screenshot/app launch, remote task round-trip and recovery on the owner's machine |
 | 3. Autonomous Scheduler | Durable local scheduler and Hub-side scheduled queue contract | Live scheduled execution, missed-task reconciliation, bounded retry and expiry tests across restart/offline windows |
 | 4. Android & Browser | Android pairing, encrypted Keystore credentials, heartbeat, local voice and app-launch preview | Physical Android acceptance; permission-mediated task consumer; browser extension is not implemented |
