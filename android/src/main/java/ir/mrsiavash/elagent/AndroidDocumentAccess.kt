@@ -33,8 +33,11 @@ object DocumentAccessPolicy {
         return normalized.startsWith("text/") || normalized in supportedExactTypes
     }
 
+    fun hasReadPermission(resultFlags: Int): Boolean =
+        resultFlags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0
+
     fun canPersistReadPermission(resultFlags: Int): Boolean {
-        val read = resultFlags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0
+        val read = hasReadPermission(resultFlags)
         val persistable = resultFlags and Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION != 0
         return read && persistable
     }
