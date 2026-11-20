@@ -8,6 +8,13 @@ import org.junit.Test
 class AndroidTaskPolicyTest {
     private val scopes = setOf("device.heartbeat", "app.launch")
 
+    @Test fun acceptsOnlyHeartbeatAndOptionalAppLaunchScopes() {
+        assertTrue(AndroidTaskPolicy.areSupportedScopes(setOf("device.heartbeat")))
+        assertTrue(AndroidTaskPolicy.areSupportedScopes(setOf("device.heartbeat", "app.launch")))
+        assertFalse(AndroidTaskPolicy.areSupportedScopes(setOf("app.launch")))
+        assertFalse(AndroidTaskPolicy.areSupportedScopes(setOf("device.heartbeat", "screen.capture")))
+    }
+
     @Test fun allowsOnlyAndroidSupportedAppAliases() {
         assertTrue(AndroidTaskPolicy.canLaunch("app.launch", "app.launch", "chatgpt", scopes))
         assertTrue(AndroidTaskPolicy.canLaunch("app.launch", "app.launch", "browser", scopes))
