@@ -1,10 +1,15 @@
 package ir.mrsiavash.elagent
 
+import android.Manifest
 import android.app.Activity
 import android.app.ActivityManager
 import android.app.AlertDialog
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Color
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.MediaRecorder
 import android.net.Uri
 import android.os.Bundle
 import android.view.ViewGroup
@@ -27,6 +32,8 @@ class OfflineModelsActivity : Activity() {
     private lateinit var status: TextView
     private lateinit var modelStore: OfflineModelStore
     private var pendingModelId: String? = null
+    private var pendingWhisperModelId: String? = null
+    @Volatile private var cancelWhisperCapture = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -56,7 +63,7 @@ class OfflineModelsActivity : Activity() {
         }, params())
 
         content.addView(TextView(this).apply {
-            text = "توجه: این مرحله فقط مدل را وارد و قالب آن را بررسی می‌کند. اجرای واقعی Whisper و LLM پس از اتصال موتورهای بومی فعال می‌شود."
+            text = "موتورهای آفلاین آمادهٔ آزمایش‌اند. میکروفون فقط پس از فشردن دکمه و اعطای مجوز فعال می‌شود؛ ضبط حداکثر ۸ ثانیه است."
             textSize = 13f
             setTextColor(Color.rgb(255, 205, 120))
         }, params())
@@ -81,11 +88,16 @@ class OfflineModelsActivity : Activity() {
                 setOnClickListener { chooseModelFile(spec.id) }
             }, params())
 
-            if (spec.engine == OfflineModelEngine.LLAMA_CPP) {
-                content.addView(Button(this).apply {
+            when (spec.engine) {
+                OfflineModelEngine.LLAMA_CPP -> content.addView(Button(this).apply {
                     text = "اجرای آزمایشی مدل فارسی (آفلاین)"
                     isAllCaps = false
                     setOnClickListener { showLlmPrompt() }
+                }, params())
+                OfflineModelEngine.WHISPER_CPP -> content.addView(Button(this).apply {
+                    text = "ضبط و تبدیل گفتار فارسی · حداکثر ۸ ثانیه"
+                    isAllCaps = false
+                    setOnClickListener { requestWhisperPermission(spec.id) }
                 }, params())
             }
         }
@@ -141,13 +153,122 @@ class OfflineModelsActivity : Activity() {
             val result = runCatching { modelStore.importFromUri(modelId, uri) }
             runOnUiThread {
                 result.onSuccess { installed ->
-                    status.text = "مدل ${installed.spec.displayName} با موفقیت در فضای خصوصی برنامه ذخیره شد.\nحجم: ${formatBytes(installed.sizeBytes)}\nاین مدل هنوز تا زمان اتصال موتور بومی قابل اجرا نیست."
+                    status.text = "مدل ${installed.spec.displayName} با موفقیت در فضای خصوصی برنامه ذخیره شد.\nحجم: ${formatBytes(installed.sizeBytes)}\nبرای استفاده، دکمهٔ اجرای مربوط به همین مدل را بزن."
                 }.onFailure { error ->
                     status.text = "واردکردن مدل ناموفق بود: ${error.message ?: "خطای نامشخص"}"
                 }
                 refreshStatus()
             }
         }
+    }
+
+    private fun requestWhisperPermission(modelId: String) {
+        pendingWhisperModelId = modelId
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            startWhisperCapture(modelId)
+        } else {
+            requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), REQUEST_RECORD_AUDIO)
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != REQUEST_RECORD_AUDIO) return
+        val modelId = pendingWhisperModelId
+        pendingWhisperModelId = null
+        if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED && modelId != null) {
+            startWhisperCapture(modelId)
+        } else {
+            status.text = "مجوز میکروفون داده نشد؛ هیچ صدایی ضبط نشد."
+        }
+    }
+
+    private fun startWhisperCapture(modelId: String) {
+        if (!NativeWhisperRuntime.isAvailable) {
+            status.text = "کتابخانهٔ بومی Whisper در این نسخه بارگذاری نشده است."
+            return
+        }
+        cancelWhisperCapture = false
+        status.text = "میکروفون فعال است؛ ضبط با درخواست تو و حداکثر تا ۸ ثانیه انجام می‌شود…"
+        ioExecutor.execute {
+            val result = runCatching {
+                val manager = getSystemService(ACTIVITY_SERVICE) as ActivityManager
+                val memory = ActivityManager.MemoryInfo()
+                manager.getMemoryInfo(memory)
+                if (memory.availMem < MIN_AVAILABLE_MEMORY_BYTES) {
+                    throw IllegalStateException("حافظهٔ آزاد برای بارگذاری Whisper کافی نیست.")
+                }
+                val installed = modelStore.installedModels()
+                    .firstOrNull { it.spec.id == modelId }
+                    ?: throw IllegalStateException("ابتدا فایل مدل Whisper انتخاب‌شده را وارد کن.")
+                NativeLlamaRuntime.unload()
+                if (!NativeWhisperRuntime.loadModel(installed.file)) {
+                    throw IllegalStateException("بارگذاری مدل Whisper ناموفق بود.")
+                }
+                try {
+                    val samples = captureWhisperAudio()
+                    if (samples.isEmpty()) throw IllegalStateException("ضبط صدا کامل نشد یا لغو شد.")
+                    NativeWhisperRuntime.transcribe(samples, threads = 2)
+                        .ifBlank { "گفتاری تشخیص داده نشد؛ در محیط آرام و با گفتار واضح دوباره امتحان کن." }
+                } finally {
+                    NativeWhisperRuntime.unload()
+                }
+            }
+            runOnUiThread {
+                result.onSuccess { transcript ->
+                    status.text = "متن تشخیص‌داده‌شده:\n$transcript"
+                }.onFailure { error ->
+                    status.text = "تبدیل گفتار ناموفق بود: ${error.message ?: "خطای نامشخص"}"
+                }
+            }
+        }
+    }
+
+    private fun captureWhisperAudio(): FloatArray {
+        val sampleRate = 16_000
+        val maxSamples = sampleRate * MAX_RECORD_SECONDS
+        val minBuffer = AudioRecord.getMinBufferSize(
+            sampleRate,
+            AudioFormat.CHANNEL_IN_MONO,
+            AudioFormat.ENCODING_PCM_16BIT
+        )
+        if (minBuffer <= 0) throw IllegalStateException("تنظیم ضبط صدا روی این دستگاه پشتیبانی نمی‌شود.")
+        val recorder = AudioRecord(
+            MediaRecorder.AudioSource.MIC,
+            sampleRate,
+            AudioFormat.CHANNEL_IN_MONO,
+            AudioFormat.ENCODING_PCM_16BIT,
+            maxOf(minBuffer, 4096)
+        )
+        if (recorder.state != AudioRecord.STATE_INITIALIZED) {
+            recorder.release()
+            throw IllegalStateException("راه‌اندازی میکروفون ناموفق بود.")
+        }
+
+        val collected = ArrayList<Short>(maxSamples)
+        val buffer = ShortArray(2048)
+        try {
+            recorder.startRecording()
+            while (collected.size < maxSamples && !cancelWhisperCapture) {
+                val count = recorder.read(buffer, 0, minOf(buffer.size, maxSamples - collected.size))
+                if (count == AudioRecord.ERROR_DEAD_OBJECT || count == AudioRecord.ERROR_INVALID_OPERATION ||
+                    count == AudioRecord.ERROR_BAD_VALUE) {
+                    throw IllegalStateException("خواندن داده از میکروفون ناموفق بود.")
+                }
+                if (count > 0) {
+                    for (i in 0 until count) collected.add(buffer[i])
+                }
+            }
+        } finally {
+            runCatching { recorder.stop() }
+            recorder.release()
+        }
+        if (cancelWhisperCapture || collected.size < sampleRate / 2) return FloatArray(0)
+        return FloatArray(collected.size) { index -> collected[index] / 32768.0f }
     }
 
     private fun showLlmPrompt() {
@@ -214,7 +335,14 @@ class OfflineModelsActivity : Activity() {
             val summary = OfflineModelCatalog.all.joinToString("\n\n") { spec ->
                 val item = installed[spec.id]
                 if (item == null) "${spec.displayName}: نصب نشده"
-                else "${spec.displayName}: ذخیره شده · ${formatBytes(item.sizeBytes)} · اجرای موتور هنوز فعال نیست"
+                else {
+                    val runtimeReady = when (spec.engine) {
+                        OfflineModelEngine.LLAMA_CPP -> NativeLlamaRuntime.isAvailable
+                        OfflineModelEngine.WHISPER_CPP -> NativeWhisperRuntime.isAvailable
+                    }
+                    "${spec.displayName}: ذخیره شده · ${formatBytes(item.sizeBytes)} · " +
+                        if (runtimeReady) "موتور بومی آمادهٔ اجرا" else "کتابخانهٔ بومی در دسترس نیست"
+                }
             }
             runOnUiThread { status.text = summary }
         }
@@ -229,13 +357,21 @@ class OfflineModelsActivity : Activity() {
         ViewGroup.LayoutParams.WRAP_CONTENT
     ).apply { bottomMargin = 16 }
 
+    override fun onStop() {
+        cancelWhisperCapture = true
+        super.onStop()
+    }
+
     override fun onDestroy() {
+        cancelWhisperCapture = true
         ioExecutor.shutdown()
         super.onDestroy()
     }
 
     companion object {
         private const val REQUEST_MODEL_FILE = 4201
+        private const val REQUEST_RECORD_AUDIO = 4202
+        private const val MAX_RECORD_SECONDS = 8
         private const val MIN_AVAILABLE_MEMORY_BYTES = 1200L * 1024L * 1024L
     }
 }
