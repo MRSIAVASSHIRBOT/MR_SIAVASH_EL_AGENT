@@ -69,7 +69,8 @@ class MainActivity : Activity() {
         fun createPage(): Pair<ScrollView, LinearLayout> {
             val content = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
-                setPadding(22, 28, 22, 28)
+                val density = resources.displayMetrics.density
+            setPadding((22 * density).toInt(), (28 * density).toInt(), (22 * density).toInt(), (28 * density).toInt())
                 setBackgroundColor(Color.rgb(13, 19, 30))
             }
             val page = ScrollView(this).apply {
@@ -98,10 +99,13 @@ class MainActivity : Activity() {
             }
             navigationButtons.forEachIndexed { buttonIndex, button ->
                 val selected = buttonIndex == index
-                button.backgroundTintList = ColorStateList.valueOf(
-                    if (selected) Color.rgb(62, 186, 154) else Color.rgb(35, 46, 63)
-                )
-                button.setTextColor(if (selected) Color.BLACK else Color.rgb(190, 202, 220))
+                button.background = GradientDrawable(
+                    GradientDrawable.Orientation.TOP_BOTTOM,
+                    intArrayOf(if (selected) Color.rgb(54, 135, 123) else Color.rgb(26, 34, 49),
+                        if (selected) Color.rgb(37, 91, 92) else Color.rgb(20, 27, 40))
+                ).apply { cornerRadius = (10 * resources.displayMetrics.density) }
+                button.setTextColor(if (selected) Color.rgb(225, 246, 242) else Color.rgb(155, 170, 190)
+                button.elevation = (if (selected) 2 else 0) * resources.displayMetrics.density
             }
         }
         listOf("خانه", "هوش مصنوعی", "ابزارها", "اتصال").forEachIndexed { index, label ->
@@ -110,6 +114,8 @@ class MainActivity : Activity() {
                 textSize = 12f
                 isAllCaps = false
                 setPadding(2, 8, 2, 8)
+                minimumHeight = (48 * resources.displayMetrics.density).toInt()
+                tag = "navigation"
                 setOnClickListener { selectPage(index) }
             }
             navigationButtons += button
@@ -407,6 +413,7 @@ class MainActivity : Activity() {
                 val view = group.getChildAt(i)
                 when (view) {
                     is Button -> {
+                        if (view.tag == "navigation") continue
                         val label = view.text?.toString().orEmpty()
                         val isPrimary = label.contains("🎙") || label.contains("ساخت برنامه") ||
                             label.contains("تأیید و اجرای") || label.contains("اجرا") ||
