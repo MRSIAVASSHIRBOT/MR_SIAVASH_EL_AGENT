@@ -25,7 +25,7 @@
 
 ## Platform expansion
 - [x] Android native companion preview: Kotlin app, Keystore-backed credentials, owner pairing, heartbeat, and allowlisted app launch
-- [x] Android manual Hub app.launch task claim with foreground owner approval and bounded outcome reporting (Android CI pending; physical-device acceptance pending)
+- [x] Android manual Hub app.launch task claim with explicit foreground button, platform-specific alias handling, lease-deadline checks, and bounded outcome reporting (Android CI pending; physical-device acceptance pending)
 - [ ] Android background task scheduling, notification-based approvals, and screenshot support (separate permission/security review)
 - [ ] Browser extension with explicit host permissions
 - [ ] Cloud scheduling and online-device coordination
