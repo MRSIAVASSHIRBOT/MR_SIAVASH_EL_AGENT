@@ -25,6 +25,8 @@ def _normalize(text: str) -> str:
 def parse_local_intent(text: str) -> dict[str, str] | None:
     """Return only a fixed, allowlisted local action; never parse shell commands."""
     normalized = _normalize(text)
+    if normalized.startswith("سیا "):
+        normalized = normalized[4:].strip()
     if not normalized or len(normalized) > 240:
         return None
 
