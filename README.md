@@ -68,6 +68,18 @@ Cancel a pending task:
 
     .\.venv\Scripts\el-agent.exe cancel TASK_ID
 
+## Voice assistant (Windows push-to-talk)
+
+The first voice release is opt-in and local-only. It does not keep the microphone open, detect the wake word, or upload audio.
+
+See [docs/VOICE_SETUP.md](docs/VOICE_SETUP.md) for installation of optional audio packages and a Persian Vosk model. After setup, open the desktop GUI and use the Push-to-Talk panel. Only the existing fixed app-launch and explicit screenshot commands can execute; unsupported speech is rejected.
+
+Quick setup check:
+
+    el-agent voice-check
+
+The wake word «سیا», Android microphone service, and optional cloud reasoning remain later phases.
+
 ## Pair with MR_SIAVASH_HUB_AI (heartbeat scope only)
 
 The Hub API must be deployed and reachable over HTTPS (HTTP is accepted only for localhost). Pairing is owner-initiated and the one-time code expires after five minutes.
@@ -133,4 +145,4 @@ See docs/ROADMAP.md and docs/SECURITY.md. CI tests Windows and Linux with Python
 
 ## Status
 
-Version 0.2.0 adds owner-initiated Hub pairing, rotating scoped device credentials, and an outbound heartbeat containing only device ID, agent version, runtime state, and uptime. A clean Windows 11 installation and live screenshot/application-launch acceptance test are still required before calling desktop behavior verified. The scheduled ChatGPT shortcut opens ChatGPT only; sending prompts or automating a conversation is not implemented. Remote task dispatch, shared memory, Android, browser extension, and cloud scheduling remain planned.
+Version 0.2.0 adds owner-initiated Hub pairing, rotating scoped device credentials, and an outbound heartbeat containing only device ID, agent version, runtime state, and uptime. A clean Windows 11 installation and live screenshot/application-launch acceptance test are still required before calling desktop behavior verified. The scheduled ChatGPT shortcut opens ChatGPT only; sending prompts or automating a conversation is not implemented. Remote task dispatch, shared memory, Android voice, wake-word activation, browser extension, and cloud scheduling remain planned.
