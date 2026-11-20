@@ -154,9 +154,9 @@ class MainActivity : Activity() {
     private fun toggleVoice() {
         if (voiceActive) {
             voiceController.stop()
-            voiceActive = false
-            voiceButton.text = "شروع فرمان صوتی (محلی)"
-            setStatus("فرمان صوتی متوقف شد.")
+            voiceButton.isEnabled = false
+            voiceButton.text = "در حال پردازش…"
+            setStatus("ضبط متوقف شد؛ نتیجه در حال پردازش محلی است.")
             return
         }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
@@ -186,7 +186,10 @@ class MainActivity : Activity() {
 
     private fun finishVoiceUi() {
         voiceActive = false
-        if (::voiceButton.isInitialized) voiceButton.text = "شروع فرمان صوتی (محلی)"
+        if (::voiceButton.isInitialized) {
+            voiceButton.isEnabled = true
+            voiceButton.text = "شروع فرمان صوتی (محلی)"
+        }
     }
 
     private fun handleVoiceTranscript(transcript: String) {
@@ -251,7 +254,10 @@ class MainActivity : Activity() {
         if (voiceActive) {
             voiceController.cancel()
             voiceActive = false
-            if (::voiceButton.isInitialized) voiceButton.text = "شروع فرمان صوتی (محلی)"
+            if (::voiceButton.isInitialized) {
+                voiceButton.isEnabled = true
+                voiceButton.text = "شروع فرمان صوتی (محلی)"
+            }
         }
         super.onPause()
     }
