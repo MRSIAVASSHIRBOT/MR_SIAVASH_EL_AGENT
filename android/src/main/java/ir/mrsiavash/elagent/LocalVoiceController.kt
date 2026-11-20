@@ -70,8 +70,16 @@ class LocalVoiceController(
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
-            val result = tts?.setLanguage(Locale("fa", "IR"))
-            ttsReady = result != null && result >= TextToSpeech.LANG_AVAILABLE
+            val offlinePersianVoice = tts?.voices?.firstOrNull {
+                it.locale.language == Locale("fa").language && !it.isNetworkConnectionRequired
+            }
+            if (offlinePersianVoice != null) {
+                tts?.voice = offlinePersianVoice
+                ttsReady = true
+            } else {
+                ttsReady = false
+                onStatus("صدای فارسی آفلاین نصب نیست؛ پاسخ فقط به‌صورت متنی نمایش داده می‌شود.")
+            }
         }
     }
 
