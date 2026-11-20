@@ -134,14 +134,29 @@ def _validated_tokens(result: dict[str, object]) -> dict[str, object]:
 
 def _save_credentials(credentials: dict[str, object]) -> None:
     if platform.system() == "Windows":
+        from el_agent.credential_store import load_credentials as load_vault_credentials
         from el_agent.credential_store import save_credentials
         try:
             save_credentials(credentials)
+            stored = load_vault_credentials()
+            if stored != credentials:
+                raise HubClientError("Windows Credential Manager did not preserve the credential record.")
             legacy_path = credentials_path()
             if legacy_path.exists():
+                legacy = json.loads(legacy_path.read_text(encoding="utf-8"))
+                if not isinstance(legacy, dict):
+                    raise HubClientError("Legacy Hub credential file has an invalid shape; it was preserved.")
+                _validate_credential_record(legacy)
+                if (
+                    legacy.get("device_id") != credentials.get("device_id")
+                    or legacy.get("hub_url") != credentials.get("hub_url")
+                ):
+                    raise HubClientError("Legacy credentials belong to a different device or Hub; manual review is required.")
                 legacy_path.unlink()
+        except HubClientError:
+            raise
         except Exception as exc:
-            raise HubClientError("Hub credentials could not be stored securely or legacy plaintext credentials could not be removed.") from exc
+            raise HubClientError("Hub credentials could not be verified in Windows Credential Manager or legacy plaintext credentials could not be safely reconciled.") from exc
         return
     path = credentials_path()
     path.parent.mkdir(parents=True, exist_ok=True)
