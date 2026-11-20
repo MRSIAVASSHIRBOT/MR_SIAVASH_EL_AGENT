@@ -57,8 +57,20 @@ No item is complete until code, tests, privacy review, and platform acceptance e
 - [x] Add JVM tests for per-capability grants, action-specific confirmation, task identity, MIME policy, UTF-8 validation, and size limits.
 - [ ] Validate the latest exact-head Android CI and debug APK artifact.
 - [ ] Perform physical-device file-provider acceptance on Android 8+.
-- [ ] Integrate typed action planning with the provider layer and optional Hub task dispatch.
+- [x] Add an online structured planner preview with strict JSON Schema output, typed operation parsing, and an independent validation pass (physical API account/device smoke test pending).
+- [ ] Add explicit per-step review and execution adapters for supported Android actions; generated plans are currently preview-only.
 - [ ] Implement further adapters incrementally: share sheet, calendar/reminders, notification opt-in, camera, screen capture, location, contacts, and visible accessibility automation.
 
 The checkboxes above describe code/test coverage, not general Android permissions being active. Every platform capability must remain unavailable until its corresponding adapter, OS authorization UX, tests, and device acceptance are complete.
+
+
+## Android online planning (in progress)
+
+- [x] Typed plan model, strict parser, and operation allowlist.
+- [x] OpenAI HTTPS provider with redirect refusal, response bounds, and strict JSON Schema output.
+- [x] API key storage through the Android Keystore-encrypted local payload.
+- [x] MainActivity plan-preview UI; only the typed request text is sent after an explicit tap.
+- [x] JVM tests for malformed plans, unsupported operations, dependency ordering, URL safety, provider redirects, response bounds, and schema request shape.
+- [ ] Live API smoke test with an owner-supplied API key and physical-device acceptance.
+- [ ] Per-step confirmation UI and tested execution adapters; plan generation does not execute actions.
 
