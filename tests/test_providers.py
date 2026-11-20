@@ -132,3 +132,21 @@ def test_cloud_key_is_never_in_error_text(monkeypatch):
         assert "secret-test-key" not in str(exc)
     else:
         raise AssertionError("expected provider failure")
+
+
+def test_keyring_backend_fails_closed_for_plaintext_backend(monkeypatch):
+    import sys
+    from types import SimpleNamespace
+
+    class PlaintextBackend:
+        priority = 1
+
+    fake = SimpleNamespace(get_keyring=lambda: PlaintextBackend())
+    monkeypatch.setitem(sys.modules, "keyring", fake)
+    try:
+        from el_agent.providers import _keyring_module
+        _keyring_module()
+    except ProviderError as exc:
+        assert "OS credential-store backend" in str(exc)
+    else:
+        raise AssertionError("plaintext backend must not be accepted")
