@@ -7,7 +7,7 @@ from pathlib import Path
 
 def default_data_dir() -> Path:
     base = os.environ.get("LOCALAPPDATA")
-    return (Path(base) if base else Path.home() / ".mr_siavash_el_agent") / "MR_SIAVASH_EL_AGENT" if base else Path.home() / ".mr_siavash_el_agent"
+    return Path(base) / "MR_SIAVASH_EL_AGENT" if base else Path.home() / ".mr_siavash_el_agent"
 
 def token_path() -> Path:
     override = os.environ.get("EL_AGENT_TOKEN_FILE")
