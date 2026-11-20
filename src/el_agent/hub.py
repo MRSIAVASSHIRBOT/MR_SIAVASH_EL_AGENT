@@ -161,6 +161,24 @@ def load_credentials() -> dict[str, object] | None:
     required = {"hub_url", "device_id", "access_token", "refresh_token", "access_expires_at", "refresh_expires_at", "scopes"}
     if not isinstance(result, dict) or not required.issubset(result):
         raise HubClientError("Local Hub credentials are incomplete.")
+    try:
+        if validate_hub_url(str(result["hub_url"])) != result["hub_url"]:
+            raise ValueError("Hub URL is not canonical.")
+        stored_device_id = str(UUID(str(result["device_id"])))
+        if not device_id_path().is_file() or device_id_path().read_text(encoding="utf-8").strip() != stored_device_id:
+            raise ValueError("Stored device identity does not match this installation.")
+        if not isinstance(result["access_token"], str) or len(result["access_token"]) < 40:
+            raise ValueError("Access credential is invalid.")
+        if not isinstance(result["refresh_token"], str) or len(result["refresh_token"]) < 40:
+            raise ValueError("Refresh credential is invalid.")
+        if result["scopes"] != ["device.heartbeat"]:
+            raise ValueError("Stored scope is not heartbeat-only.")
+        access_expiry = datetime.fromisoformat(str(result["access_expires_at"]))
+        refresh_expiry = datetime.fromisoformat(str(result["refresh_expires_at"]))
+        if access_expiry.tzinfo is None or refresh_expiry.tzinfo is None:
+            raise ValueError("Credential expiry timestamps must be timezone-aware.")
+    except (ValueError, OSError) as exc:
+        raise HubClientError("Local Hub credentials failed validation; no network request was sent.") from exc
     return result
 
 
