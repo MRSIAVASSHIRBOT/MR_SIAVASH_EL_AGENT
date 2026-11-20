@@ -48,7 +48,8 @@ class AgentPlanExecutionTest {
         val session = AgentPlanExecutionSession(plan, "session-0001")
         session.markWaitingForResource("read")
         assertEquals(PlanStepState.WAITING_FOR_RESOURCE, session.record("read").state)
-        session.markCompleted("read", detail = "File previewed locally")
+        assertThrows(IllegalArgumentException::class.java) { session.markCompleted("read") }
+        session.markCompleted("read", resourceVerified = true, detail = "File previewed locally")
         assertTrue(session.isComplete())
     }
 
