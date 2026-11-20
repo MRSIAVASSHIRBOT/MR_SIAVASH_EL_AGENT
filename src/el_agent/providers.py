@@ -118,6 +118,8 @@ def clear_cloud_api_key() -> bool:
         return True
     except keyring.errors.PasswordDeleteError:
         return False
+    except Exception as exc:
+        raise ProviderError("The OS credential store could not remove the cloud key.") from exc
 
 
 def cloud_key_configured() -> bool:
