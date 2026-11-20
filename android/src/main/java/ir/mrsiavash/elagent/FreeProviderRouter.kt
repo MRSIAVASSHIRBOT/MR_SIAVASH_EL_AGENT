@@ -276,7 +276,7 @@ class NoFreeProviderAvailableException(
     } else {
         "هیچ‌یک از سرویس‌های رایگان در دسترس نیستند: " +
             providerErrors.joinToString("؛ ") {
-                it.provider.label + ": " + ProviderFailurePolicy.userFacing(it.kind)
+                it.provider.label + ": " + (it.message ?: ProviderFailurePolicy.userFacing(it.kind))
             } +
             (retryAfterSeconds?.let { "؛ زمان پیشنهادی تلاش مجدد: " + it + " ثانیه" } ?: "")
     }
