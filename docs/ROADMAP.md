@@ -58,7 +58,9 @@ No item is complete until code, tests, privacy review, and platform acceptance e
 - [ ] Validate the latest exact-head Android CI and debug APK artifact.
 - [ ] Perform physical-device file-provider acceptance on Android 8+.
 - [x] Add an online structured planner preview with strict JSON Schema output, typed operation parsing, and an independent validation pass (physical API account/device smoke test pending).
-- [ ] Add explicit per-step review and execution adapters for supported Android actions; generated plans are currently preview-only.
+- [x] Add explicit per-step owner review, capability-policy checks, allowlisted app/URL intents, and selected-document adapter flow.
+- [x] Gate dependent steps on owner verification of external intents; stop on failure and do not replay uncertain actions.
+- [ ] Perform physical Android device acceptance for plan review, app/URL intents, and document selection.
 - [ ] Implement further adapters incrementally: share sheet, calendar/reminders, notification opt-in, camera, screen capture, location, contacts, and visible accessibility automation.
 
 The checkboxes above describe code/test coverage, not general Android permissions being active. Every platform capability must remain unavailable until its corresponding adapter, OS authorization UX, tests, and device acceptance are complete.
@@ -72,5 +74,20 @@ The checkboxes above describe code/test coverage, not general Android permission
 - [x] MainActivity plan-preview UI; only the typed request text is sent after an explicit tap.
 - [x] JVM tests for malformed plans, unsupported operations, dependency ordering, URL safety, provider redirects, response bounds, and schema request shape.
 - [ ] Live API smoke test with an owner-supplied API key and physical-device acceptance.
-- [ ] Per-step confirmation UI and tested execution adapters; plan generation does not execute actions.
+- [x] Per-step confirmation UI and tested execution state machine; external side effects require owner verification.
+- [ ] Live API smoke test and physical-device acceptance.
 
+
+## Android reviewed plan execution (in progress)
+
+- [x] Session-scoped action IDs and deterministic execution ledger.
+- [x] Sequential state machine: pending, waiting for selected resource, dispatched, completed, and failed.
+- [x] Per-step confirmation dialog and foreground-only policy evaluation.
+- [x] Fixed ChatGPT/browser app aliases and validated HTTPS navigation through Android intents.
+- [x] Selected-document flow rechecks the actual Android read URI grant before local preview.
+- [x] External intent results require explicit owner acknowledgement before dependent steps unlock.
+- [x] Fail-closed recovery: failure or interrupted in-memory session is never automatically replayed.
+- [x] JVM tests for policy gating, ordered transitions, action-ID isolation, acknowledgement, and no-replay behavior.
+- [ ] Physical-device acceptance and live provider/API account smoke test.
+
+Execution state is intentionally in-memory only in this increment. Persisted audit/recovery is a separate step and must retain the no-replay guarantee.
