@@ -31,4 +31,17 @@ class AndroidTaskPolicyTest {
         assertEquals("permission_denied", AndroidTaskPolicy.denialCode("unknown.scope", scopes))
         assertEquals("app_not_available", AndroidTaskPolicy.denialCode("app.launch", scopes))
     }
+
+    @Test fun bindsTaskToTheExactPairedDevice() {
+        val ownerDeviceId = "00000000-0000-0000-0000-000000000001"
+        assertTrue(AndroidTaskPolicy.belongsToDevice(ownerDeviceId, ownerDeviceId))
+        assertFalse(AndroidTaskPolicy.belongsToDevice(null, ownerDeviceId))
+        assertFalse(
+            AndroidTaskPolicy.belongsToDevice(
+                "00000000-0000-0000-0000-000000000002",
+                ownerDeviceId
+            )
+        )
+    }
+
 }
