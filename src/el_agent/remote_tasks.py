@@ -165,6 +165,7 @@ def execute_claimed(claimed: dict[str, Any]) -> dict[str, Any]:
 
     outcome = "succeeded"
     error_code = None
+    action_started = False
     started = time.monotonic()
     if not scope_allowed:
         # Deny locally even if an upstream contract unexpectedly returns a
@@ -175,6 +176,7 @@ def execute_claimed(claimed: dict[str, Any]) -> dict[str, Any]:
         outcome, error_code = "failed", "execution_failed"
     else:
         try:
+            action_started = True
             _execute(task)
         except PermissionError:
             outcome, error_code = "failed", "permission_denied"
@@ -194,7 +196,7 @@ def execute_claimed(claimed: dict[str, Any]) -> dict[str, Any]:
             "task_id": task_id,
             "reported_status": "not_reported_lease_expired",
             "outcome_verified": None,
-            "action_attempted": scope_allowed and timeout_valid,
+            "action_attempted": action_started,
         }
 
     payload: dict[str, Any] = {
