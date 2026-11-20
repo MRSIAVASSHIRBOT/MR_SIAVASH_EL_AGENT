@@ -1,6 +1,8 @@
 package ir.mrsiavash.elagent
 
 import android.app.Activity
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -31,6 +33,7 @@ class MainActivity : Activity() {
         store = SecureStore(this)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.rgb(7, 19, 15))
             setPadding(28, 36, 28, 28)
         }
         val scroll = ScrollView(this).apply { addView(root) }
@@ -39,22 +42,29 @@ class MainActivity : Activity() {
         root.addView(TextView(this).apply {
             text = "MR SIAVASH EL AGENT"
             textSize = 24f
+            setTextColor(Color.rgb(232, 245, 239))
         })
         root.addView(TextView(this).apply {
             text = "Android companion · v0.3.0"
             textSize = 14f
+            setTextColor(Color.rgb(168, 196, 183))
         })
         root.addView(TextView(this).apply {
             text = "Device ID: ${store.deviceId()}"
             textSize = 12f
+            setTextColor(Color.rgb(53, 214, 160))
             setTextIsSelectable(true)
         })
         hubUrl = EditText(this).apply {
             hint = "Hub HTTPS address (https://...)"
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.rgb(145, 170, 158))
             setSingleLine(true)
         }
         pairingCode = EditText(this).apply {
             hint = "One-time pairing code"
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.rgb(145, 170, 158))
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
             setSingleLine(true)
         }
@@ -62,6 +72,8 @@ class MainActivity : Activity() {
         root.addView(pairingCode, fieldParams())
         root.addView(Button(this).apply {
             text = "Pair with Hub"
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(19, 185, 129))
+            setTextColor(Color.BLACK)
             setOnClickListener {
                 val url = hubUrl.text.toString()
                 val code = pairingCode.text.toString()
@@ -75,6 +87,8 @@ class MainActivity : Activity() {
         }, buttonParams())
         root.addView(Button(this).apply {
             text = "Send heartbeat now"
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(19, 185, 129))
+            setTextColor(Color.BLACK)
             setOnClickListener {
                 setBusy("Contacting Hub…")
                 executor.execute {
@@ -86,6 +100,8 @@ class MainActivity : Activity() {
         }, buttonParams())
         root.addView(Button(this).apply {
             text = "Open ChatGPT"
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(13, 33, 25))
+            setTextColor(Color.rgb(53, 214, 160))
             setOnClickListener {
                 runCatching { launchAllowlisted("chatgpt") }
                     .onFailure { setStatus(it.message ?: "Could not open ChatGPT.") }
@@ -93,6 +109,8 @@ class MainActivity : Activity() {
         }, buttonParams())
         root.addView(Button(this).apply {
             text = "Open browser"
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(13, 33, 25))
+            setTextColor(Color.rgb(53, 214, 160))
             setOnClickListener {
                 runCatching { launchAllowlisted("browser") }
                     .onFailure { setStatus(it.message ?: "Could not open browser.") }
@@ -100,13 +118,15 @@ class MainActivity : Activity() {
         }, buttonParams())
         root.addView(Button(this).apply {
             text = "Unpair locally"
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(74, 36, 31))
+            setTextColor(Color.rgb(255, 220, 210))
             setOnClickListener {
                 store.clearCredentialsPreservingIdentity()
                 WorkManager.getInstance(this@MainActivity).cancelUniqueWork("el-agent-heartbeat")
                 setStatus("Local credentials cleared. Revoke the device in Hub to fully disconnect.")
             }
         }, buttonParams())
-        status = TextView(this).apply { text = "Not connected"; textSize = 14f }
+        status = TextView(this).apply { text = "Not connected"; textSize = 14f; setTextColor(Color.rgb(168, 196, 183)) }
         root.addView(status, fieldParams())
         if (HubClient(store).isPaired()) scheduleHeartbeat()
     }
