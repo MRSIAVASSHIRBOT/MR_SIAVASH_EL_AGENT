@@ -52,6 +52,27 @@ class SecureStore(private val context: android.content.Context) {
         }
     }
 
+
+    @Synchronized
+    fun saveCloudApiKey(apiKey: String) {
+        require(apiKey.length in 20..512 && apiKey.none { it.isWhitespace() }) {
+            "Cloud API key is invalid."
+        }
+        val value = read()
+        value.put("cloud_api_key", apiKey)
+        write(value)
+    }
+
+    @Synchronized
+    fun cloudApiKey(): String = read().optString("cloud_api_key", "")
+
+    @Synchronized
+    fun clearCloudApiKey() {
+        val value = read()
+        value.remove("cloud_api_key")
+        write(value)
+    }
+
     fun clearCredentialsPreservingIdentity() {
         val value = read()
         value.remove("hub_url")
