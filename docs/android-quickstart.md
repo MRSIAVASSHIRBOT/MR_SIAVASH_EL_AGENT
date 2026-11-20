@@ -58,5 +58,15 @@ Tap **Unpair locally** to erase the stored Hub credentials while preserving the 
 
 On Android 12 (API 31) or newer, tap **شروع فرمان صوتی (محلی)** and grant microphone permission when prompted. The app uses Android's on-device speech recognizer only (`createOnDeviceSpeechRecognizer`) with `fa-IR`; it does not fall back to a network recognizer. Each capture is automatically stopped after 15 seconds. Availability and Persian language support depend on the device's installed offline recognition service. The only voice actions are opening ChatGPT or the browser. Unsupported speech is rejected. Listening is stopped when the activity leaves the foreground. Local Persian text-to-speech is used when the installed system voice supports it; otherwise the text response remains visible.
 
+## Online and offline text assistant
+
+The app includes a separate text assistant:
+
+- **Offline:** no network inference; only the explicit local ChatGPT/browser command allowlist is available. There is no on-device generative LLM in this preview.
+- **Online:** enter an API key you control, tap **ذخیره امن کلید آنلاین**, then select Online and send a text prompt. The key is encrypted using Android Keystore AES-GCM and is not included in the APK.
+- **Hybrid:** attempts the online request first; if it fails, it can execute only a recognized local allowlisted app-launch command. Other prompts return a clear message that an offline LLM is not installed.
+
+The user must explicitly tap Send while Online or Hybrid is selected. Only the entered text prompt is sent to the official HTTPS API; microphone audio, screenshots, files, and Hub credentials are not included. API usage may be billed separately from a ChatGPT subscription. Remove the saved key with **حذف کلید آنلاین**.
+
 ## Current limitations
 This is an Android companion preview, not full Android remote-control. Screenshot capture requires a separate Android MediaProjection consent flow and foreground service, so it is not enabled. Remote task dispatch awaits the Hub task-dispatch API release. The app does not perform arbitrary shell commands, hidden monitoring, unrestricted file access, or background UI interaction.
