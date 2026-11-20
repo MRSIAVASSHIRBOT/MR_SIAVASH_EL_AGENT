@@ -18,6 +18,12 @@ A device-side companion for the MR_SIAVASH ecosystem. Windows provides the local
 
 MR_SIAVASH_HUB_AI is the authority for device identity, scoped credentials, registry, revocation, and device health. The companion currently sends outbound heartbeat metadata only; Hub-issued remote task dispatch and shared memory are not enabled yet.
 
+## Android companion
+
+The Android companion now uses a four-section interface: Home, AI Planner, Tools, and Device Connection. Local push-to-talk voice commands include opening ChatGPT/browser and calling the user-selected Father contact. The contact is stored in the Android Keystore-backed encrypted payload.
+
+For direct calls, the owner selects the contact once from Android's system contact picker. The explicit voice command `سیا، با پدر تماس بگیر` starts the call without an in-app confirmation dialog. Android still requires its own `CALL_PHONE` runtime permission; the app cannot bypass the operating system permission prompt. Voice capture remains push-to-talk and on-device; always-on wake-word detection is not included.
+
 ## Requirements
 
 - Windows 11 recommended (Windows 10 may also work)
