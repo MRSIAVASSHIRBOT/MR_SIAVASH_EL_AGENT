@@ -116,6 +116,15 @@ class CapabilityCatalogTest {
         assertTrue(allowed.allowed)
     }
 
+    @Test fun actionIdCannotMasqueradeAsOwnerTaskId() {
+        val decision = CapabilityCatalog.evaluate(
+            CapabilityId.APP_LAUNCH,
+            ActionEffect.LOCAL_CHANGE,
+            context(foreground = false, authorizedTasks = setOf("action-1"))
+        )
+        assertFalse(decision.allowed)
+    }
+
     @Test fun accessibilityRequiresEnabledServiceAndForeground() {
         val disabled = CapabilityCatalog.evaluate(
             CapabilityId.ACCESSIBILITY_AUTOMATION, ActionEffect.LOCAL_CHANGE, context()
