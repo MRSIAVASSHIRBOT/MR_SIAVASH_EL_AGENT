@@ -38,7 +38,7 @@ class AgentPlanExecutionTest {
         session.markDispatched("open")
         assertEquals(PlanStepState.DISPATCHED, session.record("open").state)
         assertNull(session.nextRunnableStep())
-        assertThrows(IllegalArgumentException::class.java) { session.markCompleted("open") }
+        assertThrows(IllegalStateException::class.java) { session.markCompleted("open") }
         session.markCompleted("open", ownerVerified = true)
         assertEquals("display", session.nextRunnableStep()?.id)
     }
