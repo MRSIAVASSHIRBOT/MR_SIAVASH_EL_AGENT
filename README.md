@@ -1,8 +1,8 @@
 # MR_SIAVASH_EL_AGENT
 
-**Personal Digital Operator — Windows-first local MVP**
+**Personal Digital Operator — Windows desktop + Android companion preview**
 
-A device-side companion for the MR_SIAVASH ecosystem. This release provides a local Windows API, CLI, and a Tk desktop control center for explicit screenshot capture, allowlisted application launch, Persian/English quick commands, and scheduled application launch.
+A device-side companion for the MR_SIAVASH ecosystem. Windows provides the local API, CLI, and desktop control center. The Android native companion adds owner-initiated Hub pairing, encrypted device credentials, periodic heartbeat, and explicit local ChatGPT/browser launch.
 
 ## What works in this MVP
 
@@ -78,7 +78,7 @@ Quick setup check:
 
     el-agent voice-check
 
-The wake word «سیا», Android microphone service, and optional cloud reasoning remain later phases.
+The wake word «سیا» and optional cloud reasoning remain later phases.
 
 ## Pair with MR_SIAVASH_HUB_AI (heartbeat scope only)
 
@@ -136,6 +136,24 @@ This startup option runs the loopback-only API in the background; it does not en
 - No keystroke logging, hidden monitoring, credential extraction, unrestricted file access, or unattended external messages/publishing.
 - Run as the normal desktop user, not elevated administrator.
 
+## Android companion preview
+
+The native Android project is in `android/`. It currently supports:
+- Stable per-installation device identity.
+- Android Keystore AES-GCM encryption for locally stored Hub credentials.
+- Owner-initiated pairing using a short-lived code created in Hub; the owner chooses the granted scopes.
+- HTTPS-only Hub communication, short-lived access token refresh, and an on-demand heartbeat.
+- A WorkManager heartbeat constrained to an available network (Android may defer periodic work according to OS battery policy).
+- Explicit local launch of the installed ChatGPT app, with the official ChatGPT website as fallback, and a default-browser launch.
+
+The Android preview includes a foreground, button-initiated, on-device push-to-talk prototype on Android 12+ when the device provides an offline recognizer and Persian language support. Microphone permission is requested at runtime; each capture is limited to 15 seconds and listening stops when the activity leaves the foreground. It never falls back to cloud recognition. Only the fixed ChatGPT/browser aliases are executable. The Android preview does **not** yet provide screen capture, arbitrary app control, remote task dispatch, background UI launching, or shared memory. The current Hub task-dispatch API is still being developed separately; the Android client intentionally does not pretend that remote tasks are available yet.
+
+Build a debug APK:
+```bash
+gradle --no-daemon :android:assembleDebug
+```
+The APK is written to `android/build/outputs/apk/debug/android-debug.apk` (the exact generated filename may include the module name). See [Android quick start](docs/android-quickstart.md) for pairing and installation notes.
+
 ## Development
 
     python -m pip install -e ".[dev]"
@@ -145,4 +163,4 @@ See docs/ROADMAP.md and docs/SECURITY.md. CI tests Windows and Linux with Python
 
 ## Status
 
-Version 0.2.0 adds owner-initiated Hub pairing, rotating scoped device credentials, and an outbound heartbeat containing only device ID, agent version, runtime state, and uptime. A clean Windows 11 installation and live screenshot/application-launch acceptance test are still required before calling desktop behavior verified. The scheduled ChatGPT shortcut opens ChatGPT only; sending prompts or automating a conversation is not implemented. Remote task dispatch, shared memory, Android voice, wake-word activation, browser extension, and cloud scheduling remain planned.
+Windows version 0.2.0 provides owner-initiated Hub pairing, rotating scoped device credentials, and outbound heartbeat. Android companion preview 0.3.0 adds native pairing, encrypted credential storage, periodic heartbeat, and explicit local app launch. A clean Windows 11 installation and live screenshot/application-launch acceptance test are still required before calling desktop behavior verified. The scheduled ChatGPT shortcut opens ChatGPT only; sending prompts or automating a conversation is not implemented. Remote task dispatch, shared memory, browser extension, and cloud scheduling remain planned.
