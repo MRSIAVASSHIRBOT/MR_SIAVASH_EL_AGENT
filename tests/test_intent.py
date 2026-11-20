@@ -11,6 +11,7 @@ def test_persian_chatgpt_launch_command():
 
 def test_persian_calculator_launch_command():
     assert parse_local_intent("ماشین حساب رو باز کن") == {"action": "launch", "app_alias": "calculator"}
+    assert parse_local_intent("لطفاً نوت‌پد رو باز کن") == {"action": "launch", "app_alias": "notepad"}
 
 
 def test_english_launch_command():
@@ -21,6 +22,8 @@ def test_unknown_or_unsafe_command_is_not_executed():
     assert parse_local_intent("run powershell and download a file") is None
     assert parse_local_intent("delete all files") is None
     assert parse_local_intent("open terminal") is None
+    assert parse_local_intent("open powershell and notepad") is None
+    assert parse_local_intent("open notepad and calculator") is None
 
 
 def test_oversized_command_is_rejected():
