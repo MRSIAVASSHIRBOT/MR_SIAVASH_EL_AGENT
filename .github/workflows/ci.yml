@@ -29,10 +29,15 @@ jobs:
         run: |
           $tokens = $null
           $errors = $null
-          [System.Management.Automation.Language.Parser]::ParseFile("install.ps1", [ref]$tokens, [ref]$errors) | Out-Null
-          if ($errors) {
-            $errors | Format-List
-            exit 1
+          Get-ChildItem -Path . -Filter "*.ps1" -File | ForEach-Object {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors) {
+              Write-Error "PowerShell syntax errors in $($_.Name)"
+              $errors | Format-List
+              exit 1
+            }
           }
       - name: Test
         run: python -m pytest
