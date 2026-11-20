@@ -99,6 +99,33 @@ class SecureStore(private val context: android.content.Context) {
         write(value)
     }
 
+    /** Stores the user-selected family contact inside the existing AES-GCM encrypted payload. */
+    @Synchronized
+    fun saveFatherContact(name: String, phone: String) {
+        val safeName = name.trim().take(80)
+        val safePhone = phone.filter { it.isDigit() || it == '+' }
+        require(safeName.isNotBlank()) { "نام مخاطب معتبر نیست." }
+        require(safePhone.length in 3..20) { "شمارهٔ مخاطب معتبر نیست." }
+        val value = read()
+        value.put("father_contact_name", safeName)
+        value.put("father_contact_phone", safePhone)
+        write(value)
+    }
+
+    @Synchronized
+    fun fatherContactName(): String = read().optString("father_contact_name", "")
+
+    @Synchronized
+    fun fatherContactPhone(): String = read().optString("father_contact_phone", "")
+
+    @Synchronized
+    fun clearFatherContact() {
+        val value = read()
+        value.remove("father_contact_name")
+        value.remove("father_contact_phone")
+        write(value)
+    }
+
     fun clearCredentialsPreservingIdentity() {
         val value = read()
         value.remove("hub_url")
