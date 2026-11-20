@@ -20,7 +20,10 @@ class HubClient(private val store: SecureStore) {
         .build()
     private val jsonType = "application/json; charset=utf-8".toMediaType()
 
-    companion object {\n        private val credentialLock = Any()\n        private val processStartedAt = SystemClock.elapsedRealtime()\n    }
+    companion object {
+        private val credentialLock = Any()
+        private val processStartedAt = SystemClock.elapsedRealtime()
+    }
 
     private fun canonicalHubUrl(input: String): String {
         val uri = URI(input.trim())
