@@ -60,7 +60,7 @@ class MainActivity : Activity() {
             setTextColor(Color.rgb(232, 245, 239))
         })
         root.addView(TextView(this).apply {
-            text = "Android companion · v0.3.0"
+            text = "Android companion · v0.4.0"
             textSize = 14f
             setTextColor(Color.rgb(168, 196, 183))
         })
