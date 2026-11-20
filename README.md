@@ -16,7 +16,7 @@ A device-side companion for the MR_SIAVASH ecosystem. This release provides a lo
 - A deterministic Persian/English command parser for a small allowlist (e.g. «اسکرین‌شات بگیر» and «برو داخل چت جی پی تی»); unknown commands are rejected.
 - CLI commands so everyday use does not require Swagger or custom scripts.
 
-The Hub remains the future authority for identity, shared memory, remote scheduling, policy, and multi-device coordination. This repository owns the local Windows companion runtime.
+MR_SIAVASH_HUB_AI is the authority for device identity, scoped credentials, registry, revocation, and device health. The companion currently sends outbound heartbeat metadata only; Hub-issued remote task dispatch and shared memory are not enabled yet.
 
 ## Requirements
 
@@ -68,6 +68,42 @@ Cancel a pending task:
 
     .\.venv\Scripts\el-agent.exe cancel TASK_ID
 
+## Pair with MR_SIAVASH_HUB_AI (heartbeat scope only)
+
+The Hub API must be deployed and reachable over HTTPS (HTTP is accepted only for localhost). Pairing is owner-initiated and the one-time code expires after five minutes.
+
+1. Get this installation's stable device ID and least-privilege pairing payload:
+
+       .\.venv\Scripts\el-agent.exe device-id
+
+2. In the same PowerShell session, set your Hub owner access token (do not commit it or paste it into source files):
+
+       $env:MRHUB_OWNER_TOKEN = "PASTE_OWNER_ACCESS_TOKEN"
+
+3. Create an owner-authorized pairing challenge. Replace the Hub origin and use the device ID printed in step 1:
+
+       $HubUrl = "https://YOUR-HUB-ORIGIN"
+       $Payload = @{
+         device_id = "PASTE_DEVICE_ID"
+         platform = "windows"
+         label = "Windows personal assistant"
+         advertised_capabilities = @("device.heartbeat", "screen.capture", "app.launch")
+         scopes = @("device.heartbeat")
+       } | ConvertTo-Json
+       $Challenge = Invoke-RestMethod -Uri "$HubUrl/devices/pairing-challenges" -Method Post -Headers @{ Authorization = "Bearer $env:MRHUB_OWNER_TOKEN" } -ContentType "application/json" -Body $Payload
+
+4. Pair locally. The command prompts for the short-lived code without echoing it:
+
+       .\.venv\Scripts\el-agent.exe pair --hub-url $HubUrl
+
+5. Check pairing and granted scope:
+
+       .\.venv\Scripts\el-agent.exe hub-status
+
+Once paired, the local Agent sends a minimal heartbeat when its API starts. Only the device ID, agent version, runtime state, and uptime are sent. The first release does not accept remote tasks or access screenshots/files through Hub.
+
+To disconnect, run el-agent unpair to remove local credentials, then revoke the device from the Hub owner device registry using DELETE /devices/{device_id}. Local unpairing alone does not revoke the Hub-side device record. If you later need to pair this installation again after revocation, run el-agent reset-device-id and type RESET; this creates a new device identity without changing any existing Hub audit history.
+
 Optional: start the local Agent automatically after this Windows user signs in (no administrator elevation required):
 
     .\\install-startup.ps1
@@ -80,7 +116,7 @@ This startup option runs the loopback-only API in the background; it does not en
 
 ## Security boundaries
 
-- Loopback binding is enforced by the CLI; remote access is not implemented.
+- The local API is loopback-only; no inbound remote-control transport or remote task dispatch is implemented. Optional outbound Hub heartbeat is limited to minimal device health metadata.
 - Every control endpoint requires bearer authentication.
 - Screenshot capture is explicit and files remain on the local device.
 - Application launch is restricted to fixed aliases; no arbitrary shell, script, executable path, arguments, or caller-supplied URL is executed.
@@ -97,4 +133,4 @@ See docs/ROADMAP.md and docs/SECURITY.md. CI tests Windows and Linux with Python
 
 ## Status
 
-The Windows-first MVP is merged into main. The desktop control center and bounded Persian/English command grammar are implemented in the current development branch; they are not yet merged into main. Automated CI is required on Windows and Ubuntu with Python 3.11 and 3.12; a clean Windows 11 installation and live screenshot/application-launch acceptance test are still required before calling desktop behavior verified. The scheduled ChatGPT shortcut opens ChatGPT only; sending prompts or automating a conversation is not implemented. Android, browser extension, Hub pairing, shared memory, and cloud scheduling remain planned.
+Version 0.2.0 adds owner-initiated Hub pairing, rotating scoped device credentials, and an outbound heartbeat containing only device ID, agent version, runtime state, and uptime. A clean Windows 11 installation and live screenshot/application-launch acceptance test are still required before calling desktop behavior verified. The scheduled ChatGPT shortcut opens ChatGPT only; sending prompts or automating a conversation is not implemented. Remote task dispatch, shared memory, Android, browser extension, and cloud scheduling remain planned.

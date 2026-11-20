@@ -11,6 +11,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from el_agent.intent import parse_local_intent
+from el_agent.hub import hub_status
 from el_agent.security import load_token
 from el_agent.api import create_app
 import uvicorn
@@ -62,6 +63,7 @@ class DesktopControlCenter:
         ttk.Combobox(action_frame, textvariable=self.app, values=APP_ALIASES, state="readonly", width=16).pack(side="left")
         ttk.Button(action_frame, text="بازکردن برنامه", command=self.launch_selected).pack(side="left", padx=6)
         ttk.Button(action_frame, text="گرفتن Screenshot", command=self.screenshot).pack(side="left")
+        ttk.Button(action_frame, text="وضعیت اتصال Hub", command=self.show_hub_status).pack(side="left", padx=6)
 
         schedule_frame = ttk.LabelFrame(outer, text="زمان‌بندی اجرای برنامه (ISO 8601 همراه منطقه زمانی)", padding=10)
         schedule_frame.pack(fill="x", pady=5)
@@ -118,6 +120,16 @@ class DesktopControlCenter:
         try:
             result = _request("POST", f"/v1/apps/{self.app.get()}/launch")
             self.status.set(result.get("detail", "برنامه اجرا شد."))
+        except Exception as exc:
+            self._show_error(exc)
+
+    def show_hub_status(self):
+        try:
+            result = hub_status()
+            if result.get("paired"):
+                self.status.set("Hub متصل · Scope: " + ", ".join(result.get("scopes", [])))
+            else:
+                self.status.set("Hub هنوز Pair نشده است · " + str(result.get("device_id", "")))
         except Exception as exc:
             self._show_error(exc)
 

@@ -1,6 +1,7 @@
 """CLI for setup, local server, and everyday agent commands."""
 from __future__ import annotations
 import argparse
+import getpass
 import json
 import sys
 from urllib.error import HTTPError, URLError
@@ -8,6 +9,7 @@ from urllib.request import Request, urlopen
 import uvicorn
 from el_agent.security import create_token, load_token, token_path
 from el_agent.intent import parse_local_intent
+from el_agent.hub import hub_status, pair_device, pairing_challenge_payload, reset_device_id, unpair_local
 
 API = "http://127.0.0.1:8765"
 
@@ -31,6 +33,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="el-agent", description="MR_SIAVASH_EL_AGENT local Windows companion")
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("setup", help="Create local API bearer token")
+    commands.add_parser("device-id", help="Show the stable device ID and Hub pairing request")
+    pair = commands.add_parser("pair", help="Pair this device with an owner-authorized Hub challenge")
+    pair.add_argument("--hub-url", required=True, help="Hub origin; HTTPS required except localhost")
+    commands.add_parser("hub-status", help="Show local Hub pairing and scope status")
+    commands.add_parser("unpair", help="Remove local Hub credentials; owner must revoke remotely")
+    commands.add_parser("reset-device-id", help="Create a new device ID after Hub-side revocation")
     commands.add_parser("gui", help="Open desktop control center and start local API if needed")
     serve = commands.add_parser("serve", help="Start local companion API")
     serve.add_argument("--host", choices=["127.0.0.1", "localhost"], default="127.0.0.1")
@@ -56,6 +64,37 @@ def main() -> None:
             print(f"Token already exists at {token_path()}; it was not replaced.", file=sys.stderr)
             raise SystemExit(2)
         print(f"Token file: {token_path()}\nCopy this token now; it will not be printed again:\n{token}\nKeep it private. Server is loopback-only.")
+        return
+    if args.command == "device-id":
+        print(json.dumps(pairing_challenge_payload(), ensure_ascii=False, indent=2))
+        return
+    if args.command == "pair":
+        try:
+            pairing_code = getpass.getpass("Paste the 5-minute Hub pairing code: ")
+            result = pair_device(args.hub_url, pairing_code)
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        except (RuntimeError, ValueError) as exc:
+            print(str(exc), file=sys.stderr)
+            raise SystemExit(1) from exc
+        return
+    if args.command == "reset-device-id":
+        confirmation = input("Only continue after revoking the old device in Hub. Type RESET to create a new identity: ")
+        if confirmation != "RESET":
+            raise SystemExit("Device identity reset cancelled.")
+        try:
+            print(json.dumps(reset_device_id(), ensure_ascii=False, indent=2))
+        except RuntimeError as exc:
+            print(str(exc), file=sys.stderr)
+            raise SystemExit(1) from exc
+        return
+    if args.command == "hub-status":
+        print(json.dumps(hub_status(), ensure_ascii=False, indent=2))
+        return
+    if args.command == "unpair":
+        result = unpair_local()
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        if result["remote_revocation_required"]:
+            print("Revoke this device in the Hub owner device registry as well.", file=sys.stderr)
         return
     if args.command == "serve":
         from el_agent.api import create_app
