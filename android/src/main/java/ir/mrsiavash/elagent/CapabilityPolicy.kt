@@ -15,7 +15,7 @@ enum class GrantRequirement {
 enum class ActionEffect {
     READ_ONLY, LOCAL_CHANGE, EXTERNAL_COMMUNICATION, DESTRUCTIVE, FINANCIAL, SECURITY_SENSITIVE
 }
-data class CapabilitySpec(val id: CapabilityId, val grant: GrantRequirement, val description: String)
+data class CapabilitySpec(val id: CapabilityId, val grant: GrantRequirement, val description: String, val requiresExplicitConfirmation: Boolean = false)
 data class ActionContext(
     val appInForeground: Boolean,
     val platformGrantGranted: Boolean = false,
@@ -32,10 +32,10 @@ object CapabilityCatalog {
         CapabilitySpec(CapabilityId.APP_LAUNCH, GrantRequirement.NONE, "Launch an installed app through Android intents"),
         CapabilitySpec(CapabilityId.OPEN_URL, GrantRequirement.NONE, "Open a URL through the user's selected browser"),
         CapabilitySpec(CapabilityId.SELECTED_FILE_READ, GrantRequirement.USER_SELECTED_RESOURCE, "Read files explicitly selected through the Android document picker"),
-        CapabilitySpec(CapabilityId.SELECTED_FILE_WRITE, GrantRequirement.USER_SELECTED_RESOURCE, "Write to a destination explicitly selected through the Android document picker"),
+        CapabilitySpec(CapabilityId.SELECTED_FILE_WRITE, GrantRequirement.USER_SELECTED_RESOURCE, "Write to a destination explicitly selected through the Android document picker", true),
         CapabilitySpec(CapabilityId.SHARE_CONTENT, GrantRequirement.EXPLICIT_USER_CONFIRMATION, "Share user-approved content through Android Sharesheet"),
-        CapabilitySpec(CapabilityId.CALENDAR_WRITE, GrantRequirement.ANDROID_PERMISSION, "Create or update calendar entries"),
-        CapabilitySpec(CapabilityId.ALARM_WRITE, GrantRequirement.ANDROID_SYSTEM_CONSENT, "Create alarms or reminders using supported system APIs"),
+        CapabilitySpec(CapabilityId.CALENDAR_WRITE, GrantRequirement.ANDROID_PERMISSION, "Create or update calendar entries", true),
+        CapabilitySpec(CapabilityId.ALARM_WRITE, GrantRequirement.ANDROID_SYSTEM_CONSENT, "Create alarms or reminders using supported system APIs", true),
         CapabilitySpec(CapabilityId.NOTIFICATION_POST, GrantRequirement.ANDROID_PERMISSION, "Post notifications"),
         CapabilitySpec(CapabilityId.NOTIFICATION_READ, GrantRequirement.ANDROID_SYSTEM_CONSENT, "Read notifications only after explicit Settings opt-in"),
         CapabilitySpec(CapabilityId.CAMERA_CAPTURE, GrantRequirement.ANDROID_PERMISSION, "Capture an image after runtime camera permission"),
@@ -43,11 +43,11 @@ object CapabilityCatalog {
         CapabilitySpec(CapabilityId.MICROPHONE_CAPTURE, GrantRequirement.ANDROID_PERMISSION, "Capture microphone input during a visible approved session"),
         CapabilitySpec(CapabilityId.LOCATION_ACCESS, GrantRequirement.ANDROID_PERMISSION, "Access location within granted precision and duration"),
         CapabilitySpec(CapabilityId.CONTACTS_READ, GrantRequirement.ANDROID_PERMISSION, "Read contacts after runtime permission"),
-        CapabilitySpec(CapabilityId.CONTACTS_WRITE, GrantRequirement.ANDROID_PERMISSION, "Modify contacts after permission and per-operation confirmation"),
+        CapabilitySpec(CapabilityId.CONTACTS_WRITE, GrantRequirement.ANDROID_PERMISSION, "Modify contacts after permission and per-operation confirmation", true),
         CapabilitySpec(CapabilityId.SMS_SEND, GrantRequirement.EXPLICIT_USER_CONFIRMATION, "Send a user-reviewed message through an Android-supported flow"),
         CapabilitySpec(CapabilityId.CALL_INITIATE, GrantRequirement.EXPLICIT_USER_CONFIRMATION, "Initiate a call only after the user confirms the recipient"),
         CapabilitySpec(CapabilityId.ACCESSIBILITY_AUTOMATION, GrantRequirement.ACCESSIBILITY_SERVICE, "Automate visible UI after the user enables the Accessibility service"),
-        CapabilitySpec(CapabilityId.DEVICE_SETTINGS_CHANGE, GrantRequirement.EXPLICIT_USER_CONFIRMATION, "Open supported system settings or apply changes through public Android APIs"),
+        CapabilitySpec(CapabilityId.DEVICE_SETTINGS_CHANGE, GrantRequirement.EXPLICIT_USER_CONFIRMATION, "Open supported system settings or apply changes through public Android APIs", true),
         CapabilitySpec(CapabilityId.SHELL_EXECUTION, GrantRequirement.BLOCKED, "Arbitrary shell execution is not an Android app capability"),
         CapabilitySpec(CapabilityId.CREDENTIAL_EXTRACTION, GrantRequirement.BLOCKED, "Extracting credentials or secrets is prohibited"),
         CapabilitySpec(CapabilityId.HIDDEN_MONITORING, GrantRequirement.BLOCKED, "Hidden surveillance or covert capture is prohibited")
@@ -72,7 +72,7 @@ object CapabilityCatalog {
         }
         if (!grantSatisfied) return PolicyDecision(false, true, "Required Android or user authorization has not been granted.")
         val highImpact = effect in setOf(ActionEffect.EXTERNAL_COMMUNICATION, ActionEffect.DESTRUCTIVE, ActionEffect.FINANCIAL, ActionEffect.SECURITY_SENSITIVE)
-        if (highImpact && !context.explicitConfirmation) {
+        if ((spec.requiresExplicitConfirmation || highImpact) && !context.explicitConfirmation) {
             return PolicyDecision(false, true, "This action requires final confirmation immediately before execution.")
         }
         return PolicyDecision(true, false, "Capability and action policy checks passed.")
