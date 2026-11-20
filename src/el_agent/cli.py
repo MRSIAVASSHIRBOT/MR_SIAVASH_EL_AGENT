@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import getpass
 import json
+import os
 import sys
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -11,6 +12,7 @@ from el_agent.security import create_token, load_token, token_path
 from el_agent.intent import parse_local_intent
 from el_agent.hub import hub_status, pair_device, pairing_challenge_payload, reset_device_id, unpair_local
 from el_agent.voice import get_voice_setup_status
+from el_agent.providers import ProviderError, ProviderRouter, clear_cloud_api_key, cloud_key_configured, set_cloud_api_key
 
 API = "http://127.0.0.1:8765"
 
@@ -42,6 +44,14 @@ def main() -> None:
     commands.add_parser("reset-device-id", help="Create a new device ID after Hub-side revocation")
     commands.add_parser("gui", help="Open desktop control center and start local API if needed")
     commands.add_parser("voice-check", help="Check optional local push-to-talk dependencies and model")
+    chat = commands.add_parser("chat", help="Chat with the configured local or online text model")
+    chat.add_argument("--mode", choices=["local", "online", "hybrid"], default="local")
+    chat.add_argument("text", nargs="+", help="Text sent to the selected model")
+    provider_key = commands.add_parser("provider-key", help="Manage the cloud API key in the OS credential store")
+    provider_key_actions = provider_key.add_subparsers(dest="provider_key_action", required=True)
+    provider_key_actions.add_parser("set", help="Store a cloud API key using hidden input")
+    provider_key_actions.add_parser("clear", help="Delete the stored cloud API key")
+    commands.add_parser("ai-status", help="Show configured intelligence providers without exposing credentials")
     serve = commands.add_parser("serve", help="Start local companion API")
     serve.add_argument("--host", choices=["127.0.0.1", "localhost"], default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8765)
@@ -103,6 +113,41 @@ def main() -> None:
         print(json.dumps(result, ensure_ascii=False, indent=2))
         if not result["ready"]:
             raise SystemExit(2)
+        return
+    if args.command == "provider-key":
+        try:
+            if args.provider_key_action == "set":
+                value = getpass.getpass("Cloud API key (input hidden): ")
+                set_cloud_api_key(value)
+                print("Cloud API key saved in the OS credential store.")
+            else:
+                removed = clear_cloud_api_key()
+                print("Cloud API key removed." if removed else "No cloud API key was stored.")
+        except (ProviderError, ValueError) as exc:
+            print(str(exc), file=sys.stderr)
+            raise SystemExit(1) from exc
+        return
+    if args.command == "ai-status":
+        print(json.dumps({
+            "default_mode": "local",
+            "local_provider": "Ollama at 127.0.0.1:11434",
+            "local_model": os.environ.get("EL_AGENT_OLLAMA_MODEL", "llama3.1:8b"),
+            "cloud_provider": "OpenAI API",
+            "cloud_model": os.environ.get("EL_AGENT_CLOUD_MODEL", "gpt-4o-mini"),
+            "cloud_api_key_configured": cloud_key_configured(),
+        }, ensure_ascii=False, indent=2))
+        return
+    if args.command == "chat":
+        try:
+            result = ProviderRouter().chat(" ".join(args.text), args.mode)
+            print(json.dumps({
+                "content": result.content, "provider": result.provider, "model": result.model,
+                "mode": result.mode, "latency_ms": result.latency_ms,
+                "fallback_used": result.fallback_used,
+            }, ensure_ascii=False, indent=2))
+        except (ProviderError, ValueError) as exc:
+            print(str(exc), file=sys.stderr)
+            raise SystemExit(1) from exc
         return
     if args.command == "serve":
         from el_agent.api import create_app
