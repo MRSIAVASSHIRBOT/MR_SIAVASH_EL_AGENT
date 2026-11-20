@@ -95,7 +95,7 @@ class HubClient(private val store: SecureStore) {
             .put("refresh_expires_at", now + refreshTtl * 1000L)
             .put("scopes", scopes)
         store.write(saved)
-        return "Paired successfully. Granted scopes: device.heartbeat"
+        return "Paired successfully. Granted scopes: ${grantedScopes.sorted().joinToString()}"
     }
 
     fun refreshIfNeeded(): JSONObject = synchronized(credentialLock) {
