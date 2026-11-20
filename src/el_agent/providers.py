@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import os
+import platform
 import time
 from dataclasses import dataclass
 from enum import Enum
@@ -85,8 +86,14 @@ def _keyring_module():
     except ImportError as exc:
         raise ProviderError("Cloud key storage is unavailable. Install the optional cloud dependencies.") from exc
     backend = keyring.get_keyring()
-    if getattr(backend, "priority", 0) <= 0:
-        raise ProviderError("No secure OS credential-store backend is available; cloud credentials were not saved.")
+    module = type(backend).__module__
+    allowed = {
+        "Windows": ("keyring.backends.Windows",),
+        "Darwin": ("keyring.backends.macOS",),
+        "Linux": ("keyring.backends.SecretService", "keyring.backends.kwallet"),
+    }.get(platform.system(), ())
+    if getattr(backend, "priority", 0) <= 0 or not any(module.startswith(prefix) for prefix in allowed):
+        raise ProviderError("A supported OS credential-store backend is unavailable; cloud credentials were not saved.")
     return keyring
 
 
