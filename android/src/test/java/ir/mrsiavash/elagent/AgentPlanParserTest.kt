@@ -7,6 +7,13 @@ class AgentPlanParserTest {
     private fun plan(steps: String, extra: String = "") =
         """{"schema_version":1,"summary":"Test plan","steps":[$steps]$extra}"""
 
+    @Test fun requiresIntegerSchemaVersion() {
+        val fractional = """{"schema_version":1.0,"summary":"Test","steps":[{"id":"show","operation":"show_text","text":"hi","depends_on":[]}]}"""
+        val stringVersion = """{"schema_version":"1","summary":"Test","steps":[{"id":"show","operation":"show_text","text":"hi","depends_on":[]}]}"""
+        assertThrows(IllegalArgumentException::class.java) { AgentPlanParser.parse(fractional) }
+        assertThrows(IllegalArgumentException::class.java) { AgentPlanParser.parse(stringVersion) }
+    }
+
     @Test fun parsesSupportedAppLaunchAndDisplayText() {
         val parsed = AgentPlanParser.parse(
             plan("""{"id":"open_chat","operation":"open_app","target":"chatgpt","depends_on":[]}""")
