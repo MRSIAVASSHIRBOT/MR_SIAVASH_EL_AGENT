@@ -32,10 +32,21 @@ class AgentPlanExecutionSession(
 
     init {
         require(sessionId.matches(Regex("[A-Za-z0-9_-]{8,80}"))) { "Execution session ID is invalid." }
-        require(plan.steps.map { it.id }.distinct().size == plan.steps.size) {
-            "Execution plan contains duplicate step IDs."
+        require(plan.steps.size in 1..AgentPlanParser.MAX_STEPS) {
+            "Execution plan step count is outside the supported range."
         }
+        val earlierIds = linkedSetOf<String>()
         plan.steps.forEach { step ->
+            require(step.id.matches(Regex("[a-z][a-z0-9_-]{0,31}")) && step.id !in earlierIds) {
+                "Execution plan contains an invalid or duplicate step ID."
+            }
+            require(step.dependsOn.all { it in earlierIds }) {
+                "Execution plan dependencies must refer only to earlier steps."
+            }
+            require(AgentPlanPolicy.isSafeForExecution(step)) {
+                "Execution plan contains a step outside the Android execution allowlist."
+            }
+            earlierIds.add(step.id)
             records[step.id] = PlanStepRecord(
                 stepId = step.id,
                 actionId = actionIdFor(step.id),
@@ -171,6 +182,9 @@ data class PlanPolicyContext(
 /** Maps one owner-reviewed plan step into the central Android capability policy. */
 object AgentPlanExecutionPolicy {
     fun evaluate(step: AgentPlanStep, context: PlanPolicyContext): PolicyDecision {
+        if (!AgentPlanPolicy.isSafeForExecution(step)) {
+            return PolicyDecision(false, false, "The typed action is outside the Android execution allowlist.")
+        }
         if (context.actionId.isBlank()) {
             return PolicyDecision(false, false, "A stable action identifier is required.")
         }
