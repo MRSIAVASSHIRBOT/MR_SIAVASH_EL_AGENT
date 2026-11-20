@@ -50,12 +50,12 @@ class OpenAiChatProvider(
         }
         return complete(
             JSONArray().put(JSONObject().put("role", "user").put("content", prompt.trim())),
-            jsonMode = false,
+            structuredMode = false,
             maxTokens = 256
         )
     }
 
-    /** Requests JSON-object mode; callers must still validate the untrusted completion. */
+    /** Requests strict JSON Schema output; callers still validate the untrusted completion locally. */
     fun chatJson(systemPrompt: String, userPrompt: String): String {
         require(systemPrompt.isNotBlank() && systemPrompt.length <= MAX_SYSTEM_PROMPT_CHARS) {
             "System prompt is missing or too long."
@@ -66,15 +66,15 @@ class OpenAiChatProvider(
         val messages = JSONArray()
             .put(JSONObject().put("role", "system").put("content", systemPrompt))
             .put(JSONObject().put("role", "user").put("content", userPrompt))
-        return complete(messages, jsonMode = true, maxTokens = 900)
+        return complete(messages, structuredMode = true, maxTokens = 900)
     }
 
-    private fun complete(messages: JSONArray, jsonMode: Boolean, maxTokens: Int): String {
+    private fun complete(messages: JSONArray, structuredMode: Boolean, maxTokens: Int): String {
         val payload = JSONObject()
             .put("model", model)
             .put("messages", messages)
             .put("max_completion_tokens", maxTokens)
-        if (jsonMode) {
+        if (structuredMode) {
             payload.put(
                 "response_format",
                 JSONObject()
