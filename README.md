@@ -68,6 +68,18 @@ Cancel a pending task:
 
     .\.venv\Scripts\el-agent.exe cancel TASK_ID
 
+## Voice assistant (Windows push-to-talk)
+
+The first voice release is opt-in and local-only. It does not keep the microphone open, detect the wake word, or upload audio.
+
+See [docs/VOICE_SETUP.md](docs/VOICE_SETUP.md) for installation of optional audio packages and a Persian Vosk model. After setup, open the desktop GUI and use the Push-to-Talk panel. Only the existing fixed app-launch and explicit screenshot commands can execute; unsupported speech is rejected.
+
+Quick setup check:
+
+    el-agent voice-check
+
+The wake word «سیا», Android push-to-talk, and optional cloud reasoning remain later phases.
+
 ## Pair with MR_SIAVASH_HUB_AI (heartbeat scope only)
 
 The Hub API must be deployed and reachable over HTTPS (HTTP is accepted only for localhost). Pairing is owner-initiated and the one-time code expires after five minutes.
