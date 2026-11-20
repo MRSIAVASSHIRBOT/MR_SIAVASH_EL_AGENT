@@ -304,8 +304,8 @@ def heartbeat_once() -> dict[str, object]:
         raise HubClientError("Local Hub credential expiry metadata is invalid.") from exc
     if access_expiry.tzinfo is None or refresh_expiry.tzinfo is None:
         raise HubClientError("Local Hub credential expiry metadata must include a timezone.")
-    if credentials.get("scopes") != ["device.heartbeat"]:
-        raise HubClientError("Local Hub credentials do not have the expected heartbeat-only scope.")
+    if not isinstance(credentials.get("scopes"), list) or "device.heartbeat" not in credentials["scopes"]:
+        raise HubClientError("Local Hub credentials do not include the required heartbeat scope.")
     if refresh_expiry <= now:
         raise HubClientError("Hub refresh credential expired; owner-initiated re-pairing is required.")
     if access_expiry <= now + timedelta(seconds=HEARTBEAT_REFRESH_WINDOW_SECONDS):
