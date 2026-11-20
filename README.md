@@ -78,7 +78,7 @@ Quick setup check:
 
     el-agent voice-check
 
-The wake word «سیا», Android push-to-talk, and optional cloud reasoning remain later phases.
+The wake word «سیا» and optional cloud reasoning remain later phases.
 
 ## Pair with MR_SIAVASH_HUB_AI (heartbeat scope only)
 
@@ -146,7 +146,7 @@ The native Android project is in `android/`. It currently supports:
 - A WorkManager heartbeat constrained to an available network (Android may defer periodic work according to OS battery policy).
 - Explicit local launch of the installed ChatGPT app, with the official ChatGPT website as fallback, and a default-browser launch.
 
-The Android preview does **not** yet provide screen capture, arbitrary app control, remote task dispatch, background UI launching, or shared memory. The current Hub task-dispatch API is still being developed separately; the Android client intentionally does not pretend that remote tasks are available yet.
+The Android preview includes a foreground, button-initiated, on-device push-to-talk prototype on Android 12+ when the device provides an offline recognizer and Persian language support. Microphone permission is requested at runtime; listening stops when the activity leaves the foreground. It never falls back to cloud recognition. Only the fixed ChatGPT/browser aliases are executable. The Android preview does **not** yet provide screen capture, arbitrary app control, remote task dispatch, background UI launching, or shared memory. The current Hub task-dispatch API is still being developed separately; the Android client intentionally does not pretend that remote tasks are available yet.
 
 Build a debug APK:
 ```bash
