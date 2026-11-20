@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import threading
+import time
 import tkinter as tk
 from datetime import datetime
 from tkinter import messagebox, ttk
@@ -10,6 +12,8 @@ from urllib.request import Request, urlopen
 
 from el_agent.intent import parse_local_intent
 from el_agent.security import load_token
+from el_agent.api import create_app
+import uvicorn
 
 API = "http://127.0.0.1:8765"
 APP_ALIASES = ("notepad", "calculator", "explorer", "browser", "chatgpt")
@@ -170,6 +174,32 @@ class DesktopControlCenter:
 
 
 def main():
+    load_token()
+    server = None
+    server_thread = None
+    try:
+        _request("GET", "/health")
+    except Exception:
+        config = uvicorn.Config(
+            create_app(), host="127.0.0.1", port=8765,
+            log_level="warning", access_log=False, server_header=False,
+        )
+        server = uvicorn.Server(config)
+        server_thread = threading.Thread(target=server.run, name="el-agent-api", daemon=True)
+        server_thread.start()
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline and not server.started:
+            time.sleep(0.1)
+        if not server.started:
+            server.should_exit = True
+            raise RuntimeError("Local Agent API did not start on 127.0.0.1:8765")
+
     root = tk.Tk()
     DesktopControlCenter(root)
-    root.mainloop()
+    try:
+        root.mainloop()
+    finally:
+        if server is not None:
+            server.should_exit = True
+        if server_thread is not None:
+            server_thread.join(timeout=3)
