@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, field_validator
 from el_agent.actions import APP_ALLOWLIST, capture_screenshot, launch_app
 from el_agent.security import load_token, token_matches
-from el_agent.service import screenshot_dir, task_store, scheduler_loop
+from el_agent.service import screenshot_dir, task_store, scheduler_loop, hub_heartbeat_loop
 from el_agent.store import TaskStore
 
 class ScheduleRequest(BaseModel):
@@ -37,13 +37,18 @@ def create_app(*, token: str | None = None, store: TaskStore | None = None, scre
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         worker = asyncio.create_task(scheduler_loop(db))
+        hub_worker = asyncio.create_task(hub_heartbeat_loop())
         try:
             yield
         finally:
             worker.cancel()
-            try: await worker
-            except asyncio.CancelledError: pass
-    app = FastAPI(title="MR_SIAVASH_EL_AGENT", version="0.1.0", description="Local Windows companion; loopback-only.")
+            hub_worker.cancel()
+            for task in (worker, hub_worker):
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+    app = FastAPI(title="MR_SIAVASH_EL_AGENT", version="0.2.0", description="Local Windows companion; loopback-only.")
     app.router.lifespan_context = lifespan
     async def auth(authorization: str | None = Header(default=None)) -> None:
         scheme, _, candidate = (authorization or "").partition(" ")
@@ -51,7 +56,7 @@ def create_app(*, token: str | None = None, store: TaskStore | None = None, scre
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or missing bearer token")
     @app.get("/health")
     async def health():
-        return {"status":"ok","service":"MR_SIAVASH_EL_AGENT","version":"0.1.0"}
+        return {"status":"ok","service":"MR_SIAVASH_EL_AGENT","version":"0.2.0"}
     @app.get("/v1/device")
     async def device(_: None = Depends(auth)):
         return {"platform":"windows","mode":"local","remote_access":False,
