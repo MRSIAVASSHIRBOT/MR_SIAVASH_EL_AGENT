@@ -36,6 +36,11 @@ class MainActivity : Activity() {
     private val recordAudioRequest = 4102
     private val openDocumentRequest = 4103
     private lateinit var documentPreview: TextView
+    private lateinit var plannerApiKey: EditText
+    private lateinit var plannerModel: EditText
+    private lateinit var plannerRequest: EditText
+    private lateinit var plannerButton: Button
+    private lateinit var plannerOutput: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -54,7 +59,7 @@ class MainActivity : Activity() {
             setTextColor(Color.rgb(232, 245, 239))
         })
         root.addView(TextView(this).apply {
-            text = "Android companion · v0.3.0"
+            text = "Android companion · v0.4.0"
             textSize = 14f
             setTextColor(Color.rgb(168, 196, 183))
         })
@@ -149,6 +154,76 @@ class MainActivity : Activity() {
             setTextIsSelectable(true)
         }
         root.addView(documentPreview, fieldParams())
+        root.addView(TextView(this).apply {
+            text = "برنامه‌ریز هوشمند · تبدیل درخواست به مراحل ساختاریافته"
+            textSize = 17f
+            setTextColor(Color.rgb(53, 214, 160))
+        }, fieldParams())
+        plannerApiKey = EditText(this).apply {
+            hint = "کلید OpenAI API (ذخیره‌شده به‌صورت رمزگذاری‌شده)"
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.rgb(145, 170, 158))
+            setSingleLine(true)
+        }
+        root.addView(plannerApiKey, fieldParams())
+        root.addView(Button(this).apply {
+            text = "ذخیره امن کلید API"
+            setOnClickListener {
+                runCatching { store.saveCloudApiKey(plannerApiKey.text.toString()) }
+                    .onSuccess {
+                        plannerApiKey.text.clear()
+                        setStatus("کلید در محفظهٔ رمزگذاری‌شدهٔ Android ذخیره شد.")
+                    }
+                    .onFailure { setStatus(it.message ?: "ذخیرهٔ کلید ناموفق بود.") }
+            }
+        }, buttonParams())
+        root.addView(Button(this).apply {
+            text = "حذف کلید API"
+            setOnClickListener {
+                runCatching { store.clearCloudApiKey() }
+                    .onSuccess {
+                        plannerApiKey.text.clear()
+                        setStatus("کلید API از حافظهٔ رمزگذاری‌شده حذف شد.")
+                    }
+                    .onFailure { setStatus(it.message ?: "حذف کلید ناموفق بود.") }
+            }
+        }, buttonParams())
+        plannerModel = EditText(this).apply {
+            hint = "شناسهٔ مدل فعال در حساب API"
+            setText("gpt-4o-mini")
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.rgb(145, 170, 158))
+            setSingleLine(true)
+        }
+        root.addView(plannerModel, fieldParams())
+        root.addView(TextView(this).apply {
+            text = "درخواست فقط برای ساخت طرح به API ارسال می‌شود؛ فایل، تصویر، صدای میکروفون و حافظه ارسال نمی‌شوند. استفاده از API ممکن است هزینهٔ جداگانه داشته باشد."
+            textSize = 12f
+            setTextColor(Color.rgb(190, 205, 196))
+        }, fieldParams())
+        plannerRequest = EditText(this).apply {
+            hint = "درخواستت را بنویس؛ مثلاً: مرورگر را باز کن و این صفحه را نمایش بده."
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.rgb(145, 170, 158))
+            minLines = 3
+            maxLines = 5
+        }
+        root.addView(plannerRequest, fieldParams())
+        plannerButton = Button(this).apply {
+            text = "ساخت برنامهٔ اجرایی (بدون اجرا)"
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(19, 185, 129))
+            setTextColor(Color.BLACK)
+            setOnClickListener { generatePlan() }
+        }
+        root.addView(plannerButton, buttonParams())
+        plannerOutput = TextView(this).apply {
+            text = "طرح ساخته‌شده اینجا نمایش داده می‌شود. هیچ مرحله‌ای صرفاً با تولید طرح اجرا نخواهد شد."
+            textSize = 14f
+            setTextColor(Color.rgb(232, 245, 239))
+            setTextIsSelectable(true)
+        }
+        root.addView(plannerOutput, fieldParams())
         root.addView(Button(this).apply {
             text = "Unpair locally"
             backgroundTintList = ColorStateList.valueOf(Color.rgb(74, 36, 31))
@@ -168,6 +243,46 @@ class MainActivity : Activity() {
         }
     }
 
+
+    private fun generatePlan() {
+        val requestText = plannerRequest.text.toString()
+        if (requestText.isBlank() || requestText.length > 4_000) {
+            setStatus("درخواست باید بین ۱ تا ۴۰۰۰ نویسه باشد.")
+            return
+        }
+        val key = runCatching { store.cloudApiKey() }.getOrElse {
+            setStatus("خواندن کلید امن API ناموفق بود.")
+            return
+        }
+        if (key.isBlank()) {
+            setStatus("ابتدا کلید API خود را در همین برنامه ذخیره کنید.")
+            return
+        }
+        val model = plannerModel.text.toString().trim()
+        plannerButton.isEnabled = false
+        plannerOutput.text = "در حال ساخت طرح ساختاریافته…"
+        setStatus("درخواست متنی به مدل آنلاین ارسال شد.")
+        executor.execute {
+            val result = runCatching {
+                val provider = OpenAiChatProvider(key, model)
+                val raw = provider.chatJson(
+                    AgentPlanPrompt.SYSTEM_PROMPT,
+                    AgentPlanPrompt.userMessage(requestText)
+                )
+                AgentPlanParser.parse(raw)
+            }
+            runOnUiThread {
+                plannerButton.isEnabled = true
+                result.onSuccess { plan ->
+                    plannerOutput.text = AgentPlanPolicy.render(plan)
+                    setStatus("طرح دریافت و اعتبارسنجی شد؛ هیچ مرحله‌ای اجرا نشده است.")
+                }.onFailure { error ->
+                    plannerOutput.text = "ساخت یا اعتبارسنجی طرح ناموفق بود: ${error.message ?: "خطای نامشخص"}"
+                    setStatus("طرح نامعتبر یا سرویس آنلاین ناموفق بود.")
+                }
+            }
+        }
+    }
 
     @Suppress("DEPRECATION")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
