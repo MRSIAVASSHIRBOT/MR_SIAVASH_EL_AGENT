@@ -1,5 +1,5 @@
 from el_agent.providers import (
-    ChatResult, IntelligenceMode, ProviderError, ProviderRouter,
+    ChatResult, ProviderError, ProviderRouter,
     MAX_PROMPT_CHARS, OllamaChatProvider, OpenAIChatProvider,
 )
 
@@ -153,8 +153,6 @@ def test_keyring_backend_fails_closed_for_plaintext_backend(monkeypatch):
 
 
 def test_online_provider_requires_an_explicit_api_model(monkeypatch):
-    import os
-
     monkeypatch.delenv("EL_AGENT_CLOUD_MODEL", raising=False)
     provider = OpenAIChatProvider()
     try:
