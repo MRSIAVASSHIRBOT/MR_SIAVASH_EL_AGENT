@@ -27,6 +27,8 @@ import androidx.work.WorkManager
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.time.Duration
+import java.time.Instant
 
 class MainActivity : Activity() {
     private val executor = Executors.newSingleThreadExecutor()
@@ -265,11 +267,23 @@ class MainActivity : Activity() {
                     return@execute
                 }
 
+                val leaseRemainingMs = Duration.between(Instant.now(), claim.leaseExpiresAt).toMillis()
+                val executionBudgetMs = minOf(claim.timeoutSeconds * 1000L, leaseRemainingMs)
+                if (executionBudgetMs <= 0L) {
+                    runOnUiThread {
+                        setStatus("Hub task lease expired before Android execution; no app was opened.")
+                    }
+                    return@execute
+                }
+
                 val completed = CountDownLatch(1)
                 var launchError: Throwable? = null
                 runOnUiThread {
                     try {
-                        if (SystemClock.elapsedRealtime() - startedAt >= claim.timeoutSeconds * 1000L) {
+                        if (
+                            SystemClock.elapsedRealtime() - startedAt >= executionBudgetMs ||
+                            !Instant.now().isBefore(claim.leaseExpiresAt)
+                        ) {
                             throw java.util.concurrent.TimeoutException("Android UI was not ready before the task lease deadline.")
                         }
                         if (isFinishing || isDestroyed) {
@@ -283,7 +297,7 @@ class MainActivity : Activity() {
                     }
                 }
 
-                val finishedInTime = completed.await(claim.timeoutSeconds, TimeUnit.SECONDS)
+                val finishedInTime = completed.await(executionBudgetMs, TimeUnit.MILLISECONDS)
                 val durationMs = (SystemClock.elapsedRealtime() - startedAt).coerceAtLeast(0L)
                 if (!finishedInTime) {
                     // Do not report a false failure or retry an ambiguous launch.
