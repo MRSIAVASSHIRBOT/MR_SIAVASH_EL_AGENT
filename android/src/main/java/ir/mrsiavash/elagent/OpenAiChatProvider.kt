@@ -74,7 +74,20 @@ class OpenAiChatProvider(
             .put("model", model)
             .put("messages", messages)
             .put("max_completion_tokens", maxTokens)
-        if (jsonMode) payload.put("response_format", JSONObject().put("type", "json_object"))
+        if (jsonMode) {
+            payload.put(
+                "response_format",
+                JSONObject()
+                    .put("type", "json_schema")
+                    .put(
+                        "json_schema",
+                        JSONObject()
+                            .put("name", "android_agent_plan_v1")
+                            .put("strict", true)
+                            .put("schema", agentPlanJsonSchema())
+                    )
+            )
+        }
 
         val request = Request.Builder()
             .url(endpoint)
@@ -129,9 +142,49 @@ class OpenAiChatProvider(
 
     companion object {
         const val API_URL = "https://api.openai.com/v1/chat/completions"
-        const val MAX_PROMPT_CHARS = 4_000
+        const val MAX_PROMPT_CHARS = 5_000
         const val MAX_SYSTEM_PROMPT_CHARS = 6_000
         const val MAX_RESPONSE_BYTES = 64 * 1024
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
+
+        private fun agentPlanJsonSchema(): JSONObject {
+            val idSchema = JSONObject()
+                .put("type", "string")
+                .put("pattern", "^[a-z][a-z0-9_-]{0,31}$")
+            val stepSchema = JSONObject()
+                .put("type", "object")
+                .put("additionalProperties", false)
+                .put(
+                    "properties",
+                    JSONObject()
+                        .put("id", idSchema)
+                        .put("operation", JSONObject().put("type", "string").put(
+                            "enum", JSONArray()
+                                .put("open_app")
+                                .put("open_url")
+                                .put("read_selected_document")
+                                .put("show_text")
+                        ))
+                        .put("depends_on", JSONObject().put(
+                            "type", "array"
+                        ).put("items", idSchema).put("maxItems", 8))
+                        .put("target", JSONObject().put("type", JSONArray().put("string").put("null")).put("maxLength", 512))
+                        .put("text", JSONObject().put("type", JSONArray().put("string").put("null")).put("maxLength", 1200))
+                )
+                .put("required", JSONArray().put("id").put("operation").put("depends_on").put("target").put("text"))
+            return JSONObject()
+                .put("type", "object")
+                .put("additionalProperties", false)
+                .put(
+                    "properties",
+                    JSONObject()
+                        .put("schema_version", JSONObject().put("type", "integer").put("enum", JSONArray().put(1)))
+                        .put("summary", JSONObject().put("type", "string").put("minLength", 1).put("maxLength", 300))
+                        .put("steps", JSONObject().put("type", "array").put("items", stepSchema).put("maxItems", 8))
+                        .put("clarification", JSONObject().put("type", JSONArray().put("string").put("null")).put("maxLength", 400))
+                )
+                .put("required", JSONArray().put("schema_version").put("summary").put("steps").put("clarification"))
+        }
+
     }
 }
