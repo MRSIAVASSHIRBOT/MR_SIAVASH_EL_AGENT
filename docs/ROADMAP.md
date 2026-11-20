@@ -10,12 +10,13 @@
 - [ ] Clean Windows 11 installation and live acceptance test
 - [x] Friendly desktop control center with task management and ISO-8601 scheduling
 - [x] Deterministic Persian/English quick commands for a fixed safe allowlist
-- [ ] Windows startup integration and live acceptance test
+- [x] Optional per-user Windows logon startup scripts with removal script
+- [ ] Live Windows 11 acceptance test
 
 ## Hub integration
-- [ ] Owner-initiated single-use device pairing
-- [ ] Short-lived scoped credentials, device registry, and revocation
-- [ ] Heartbeat and audit correlation
+- [x] Owner-initiated single-use device pairing
+- [x] Short-lived scoped credentials, device registry, and revocation
+- [x] Outbound heartbeat and Hub audit correlation
 - [ ] Hub-issued task dispatch with expiry, idempotency, cancellation, and verified outcomes
 - [ ] Shared memory through Hub APIs only
 
