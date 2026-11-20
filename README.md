@@ -16,7 +16,7 @@ A device-side companion for the MR_SIAVASH ecosystem. Windows provides the local
 - A deterministic Persian/English command parser for a small allowlist (e.g. «اسکرین‌شات بگیر» and «برو داخل چت جی پی تی»); unknown commands are rejected.
 - CLI commands so everyday use does not require Swagger or custom scripts.
 
-MR_SIAVASH_HUB_AI is the authority for device identity, scoped credentials, registry, revocation, and device health. The companion currently sends outbound heartbeat metadata only; Hub-issued remote task dispatch and shared memory are not enabled yet.
+MR_SIAVASH_HUB_AI is the authority for device identity, scoped credentials, registry, revocation, task scheduling, leases, and audit. This branch adds a Windows task consumer for the Hub dispatch API merged into Hub main. The consumer accepts only allowlisted app.launch and explicitly owner-confirmed screen.capture tasks. Live operation remains gated on Hub deployment and owner-side device scope grants. Shared memory is not enabled yet.
 
 ## Requirements
 
@@ -75,6 +75,7 @@ Cancel a pending task:
 - A task left in `running` after a process restart is marked `unknown_outcome`; it is never replayed because the previous launch may already have taken effect.
 - Use `el-agent tasks` to inspect the final status. Unknown outcomes require owner review; the scheduler will not guess or retry.
 
+
 ## Text intelligence (Windows)
 
 The Windows agent provides explicit `local`, `online`, and `hybrid` text-chat modes. Local is the default and uses Ollama at `127.0.0.1:11434`; online and hybrid require a separately configured API key and model ID.
@@ -107,7 +108,7 @@ Quick setup check:
 
 The wake word «سیا» and optional cloud reasoning remain later phases.
 
-## Pair with MR_SIAVASH_HUB_AI (heartbeat scope only)
+## Pair with MR_SIAVASH_HUB_AI (least-privilege device scopes)
 
 The Hub API must be deployed and reachable over HTTPS (HTTP is accepted only for localhost). Pairing is owner-initiated and the one-time code expires after five minutes.
 
@@ -127,7 +128,7 @@ The Hub API must be deployed and reachable over HTTPS (HTTP is accepted only for
          platform = "windows"
          label = "Windows personal assistant"
          advertised_capabilities = @("device.heartbeat", "screen.capture", "app.launch")
-         scopes = @("device.heartbeat")
+         scopes = @("device.heartbeat", "app.launch", "screen.capture")
        } | ConvertTo-Json
        $Challenge = Invoke-RestMethod -Uri "$HubUrl/devices/pairing-challenges" -Method Post -Headers @{ Authorization = "Bearer $env:MRHUB_OWNER_TOKEN" } -ContentType "application/json" -Body $Payload
 
@@ -139,7 +140,7 @@ The Hub API must be deployed and reachable over HTTPS (HTTP is accepted only for
 
        .\.venv\Scripts\el-agent.exe hub-status
 
-Once paired, the local Agent sends a minimal heartbeat when its API starts. Only the device ID, agent version, runtime state, and uptime are sent. The first release does not accept remote tasks or access screenshots/files through Hub.
+On Windows, Hub credentials are stored in Windows Credential Manager through the packaged Windows keyring backend. Existing legacy JSON credentials are migrated into the vault on first read and the plaintext file is removed only after a successful vault write. If a trusted Windows vault backend is unavailable, pairing and task polling fail closed. On non-Windows development environments, the private JSON adapter remains available for tests. For Windows, the owner may grant `app.launch` and `screen.capture` in addition to `device.heartbeat`; screenshot tasks still require explicit per-task owner confirmation. Once paired, the local Agent sends minimal heartbeat metadata and polls the Hub task queue. The Hub task-dispatch API is merged to Hub main but must be deployed before live task execution. The consumer executes only the exact granted scope: allowlisted app.launch, or screen.capture when the task carries explicit owner confirmation. Captured screenshots remain local and are not uploaded. The Hub records device-reported outcomes as unverified; an expired claim is never replayed automatically.
 
 To disconnect, run el-agent unpair to remove local credentials, then revoke the device from the Hub owner device registry using DELETE /devices/{device_id}. Local unpairing alone does not revoke the Hub-side device record. If you later need to pair this installation again after revocation, run el-agent reset-device-id and type RESET; this creates a new device identity without changing any existing Hub audit history.
 
@@ -155,7 +156,7 @@ This startup option runs the loopback-only API in the background; it does not en
 
 ## Security boundaries
 
-- The local API is loopback-only; no inbound remote-control transport or remote task dispatch is implemented. Optional outbound Hub heartbeat is limited to minimal device health metadata.
+- The local API remains loopback-only. Hub task polling is outbound-only and uses short-lived paired device credentials; it does not expose a public or LAN listener.
 - Every control endpoint requires bearer authentication.
 - Screenshot capture is explicit and files remain on the local device.
 - Application launch is restricted to fixed aliases; no arbitrary shell, script, executable path, arguments, or caller-supplied URL is executed.
@@ -173,7 +174,7 @@ The native Android project is in `android/`. It currently supports:
 - A WorkManager heartbeat constrained to an available network (Android may defer periodic work according to OS battery policy).
 - Explicit local launch of the installed ChatGPT app, with the official ChatGPT website as fallback, and a default-browser launch.
 
-The Android preview includes a foreground, button-initiated, on-device push-to-talk prototype on Android 12+ when the device provides an offline recognizer and Persian language support. Microphone permission is requested at runtime; each capture is limited to 15 seconds and listening stops when the activity leaves the foreground. It never falls back to cloud recognition. Only the fixed ChatGPT/browser aliases are executable. The Android preview does **not** yet provide screen capture, arbitrary app control, remote task dispatch, background UI launching, or shared memory. The current Hub task-dispatch API is still being developed separately; the Android client intentionally does not pretend that remote tasks are available yet.
+The Android preview includes a foreground, button-initiated, on-device push-to-talk prototype on Android 12+ when the device provides an offline recognizer and Persian language support. Microphone permission is requested at runtime; each capture is limited to 15 seconds and listening stops when the activity leaves the foreground. It never falls back to cloud recognition. Only the fixed ChatGPT/browser aliases are executable. The Android preview does **not** yet provide screen capture, arbitrary app control, remote task dispatch, background UI launching, or shared memory. The Android task-consumer flow remains a separate implementation milestone and is not enabled by this Windows consumer.
 
 Build a debug APK:
 ```bash
@@ -190,4 +191,4 @@ See docs/ROADMAP.md and docs/SECURITY.md. CI tests Windows and Linux with Python
 
 ## Status
 
-Windows version 0.2.0 provides owner-initiated Hub pairing, rotating scoped device credentials, and outbound heartbeat. Android companion preview 0.3.0 adds native pairing, encrypted credential storage, periodic heartbeat, and explicit local app launch. A clean Windows 11 installation and live screenshot/application-launch acceptance test are still required before calling desktop behavior verified. The scheduled ChatGPT shortcut opens ChatGPT only; sending prompts or automating a conversation is not implemented. Remote task dispatch, shared memory, browser extension, and cloud scheduling remain planned.
+Windows version 0.2.0 provides owner-initiated Hub pairing, rotating scoped device credentials, and outbound heartbeat. Android companion preview 0.3.0 adds native pairing, encrypted credential storage, periodic heartbeat, and explicit local app launch. A clean Windows 11 installation and live screenshot/application-launch acceptance test are still required before calling desktop behavior verified. The scheduled ChatGPT shortcut opens ChatGPT only; sending prompts or automating a conversation is not implemented. Windows Hub task dispatch is implemented in this branch but awaits live Hub deployment and physical-device acceptance. Android remote task dispatch, shared memory, browser extension, and cloud scheduling remain separate milestones.
