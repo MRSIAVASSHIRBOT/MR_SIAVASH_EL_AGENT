@@ -23,10 +23,10 @@ class FreeProviderRouterTest {
             FreeProviderId.GEMINI,
             failure = ProviderRequestException(FreeProviderId.GEMINI, ProviderFailureKind.RATE_LIMIT, "limited", 12)
         )
-        val next = FakeProvider(FreeProviderId.GROQ, result = """{"steps":[]}""")
+        val next = FakeProvider(FreeProviderId.OPENROUTER, result = """{"steps":[]}""")
         val result = FreeProviderPlanRouter(providersOverride = listOf(limited, next))
             .generate("system", "user")
-        assertEquals(FreeProviderId.GROQ, result.provider)
+        assertEquals(FreeProviderId.OPENROUTER, result.provider)
         assertEquals("""{"steps":[]}""", result.json)
         assertEquals(1, limited.calls)
         assertEquals(1, next.calls)
@@ -48,8 +48,8 @@ class FreeProviderRouterTest {
             failure = ProviderRequestException(FreeProviderId.GEMINI, ProviderFailureKind.QUOTA_EXHAUSTED, "quota")
         )
         val second = FakeProvider(
-            FreeProviderId.GROQ,
-            failure = ProviderRequestException(FreeProviderId.GROQ, ProviderFailureKind.RATE_LIMIT, "limited", 25)
+            FreeProviderId.OPENROUTER,
+            failure = ProviderRequestException(FreeProviderId.OPENROUTER, ProviderFailureKind.RATE_LIMIT, "limited", 25)
         )
         val error = org.junit.Assert.assertThrows(NoFreeProviderAvailableException::class.java) {
             FreeProviderPlanRouter(providersOverride = listOf(first, second)).generate("system", "user")
@@ -85,17 +85,17 @@ class FreeProviderRouterTest {
 
     @Test fun freeProviderOrderIsExplicit() {
         assertEquals(
-            listOf(FreeProviderId.GEMINI, FreeProviderId.GROQ, FreeProviderId.OPENROUTER),
+            listOf(FreeProviderId.GEMINI, FreeProviderId.OPENROUTER),
             FreeProviderPlanRouter.DEFAULT_PROVIDER_ORDER
         )
     }
 
     @Test fun routerFallsBackWhenFirstProviderReturnsInvalidPlanJson() {
         val malformed = FakeProvider(FreeProviderId.GEMINI, result = """{"unexpected":true}""")
-        val valid = FakeProvider(FreeProviderId.GROQ, result = """{"schema_version":1,"summary":"ok","steps":[{"id":"open","operation":"open_app","depends_on":[],"target":"browser","text":null}],"clarification":null}""")
+        val valid = FakeProvider(FreeProviderId.OPENROUTER, result = """{"schema_version":1,"summary":"ok","steps":[{"id":"open","operation":"open_app","depends_on":[],"target":"browser","text":null}],"clarification":null}""")
         val result = FreeProviderPlanRouter(providersOverride = listOf(malformed, valid))
             .generate(AgentPlanPrompt.SYSTEM_PROMPT, "open browser")
-        assertEquals(FreeProviderId.GROQ, result.provider)
+        assertEquals(FreeProviderId.OPENROUTER, result.provider)
         assertEquals(1, malformed.calls)
         assertEquals(1, valid.calls)
     }
