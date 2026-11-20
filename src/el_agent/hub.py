@@ -133,6 +133,13 @@ def _validated_tokens(result: dict[str, object]) -> dict[str, object]:
 
 
 def _save_credentials(credentials: dict[str, object]) -> None:
+    if platform.system() == "Windows":
+        from el_agent.credential_store import save_credentials
+        try:
+            save_credentials(credentials)
+        except Exception as exc:
+            raise HubClientError("Hub credentials could not be stored securely in Windows Credential Manager.") from exc
+        return
     path = credentials_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, temporary_name = tempfile.mkstemp(prefix="hub-credentials-", suffix=".tmp", dir=path.parent)
@@ -151,7 +158,29 @@ def _save_credentials(credentials: dict[str, object]) -> None:
             os.unlink(temporary_name)
 
 
-def load_credentials() -> dict[str, object] | None:
+def _read_credentials_raw() -> dict[str, object] | None:
+    if platform.system() == "Windows":
+        from el_agent.credential_store import load_credentials, save_credentials
+        try:
+            stored = load_credentials()
+            if stored is not None:
+                return stored
+            # One-time migration: move an existing legacy JSON record into
+            # Credential Manager, then remove the plaintext file only after
+            # the vault write succeeds.
+            legacy_path = credentials_path()
+            if legacy_path.exists():
+                legacy = json.loads(legacy_path.read_text(encoding="utf-8"))
+                if not isinstance(legacy, dict):
+                    raise HubClientError("Legacy Hub credential file has an invalid shape.")
+                save_credentials(legacy)
+                legacy_path.unlink()
+                return legacy
+            return None
+        except HubClientError:
+            raise
+        except Exception as exc:
+            raise HubClientError("Windows Credential Manager could not safely load or migrate Hub credentials.") from exc
     path = credentials_path()
     if not path.exists():
         return None
@@ -159,8 +188,17 @@ def load_credentials() -> dict[str, object] | None:
         result = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise HubClientError("Local Hub credentials are unreadable; do not delete or overwrite them automatically.") from exc
+    if not isinstance(result, dict):
+        raise HubClientError("Local Hub credentials have an invalid shape.")
+    return result
+
+
+def load_credentials() -> dict[str, object] | None:
+    result = _read_credentials_raw()
+    if result is None:
+        return None
     required = {"hub_url", "device_id", "access_token", "refresh_token", "access_expires_at", "refresh_expires_at", "scopes"}
-    if not isinstance(result, dict) or not required.issubset(result):
+    if not required.issubset(result):
         raise HubClientError("Local Hub credentials are incomplete.")
     try:
         if validate_hub_url(str(result["hub_url"])) != result["hub_url"]:
@@ -174,6 +212,7 @@ def load_credentials() -> dict[str, object] | None:
             raise ValueError("Refresh credential is invalid.")
         if (
             not isinstance(result["scopes"], list)
+            or not all(isinstance(scope, str) for scope in result["scopes"])
             or not {"device.heartbeat"}.issubset(set(result["scopes"]))
             or not set(result["scopes"]).issubset({"device.heartbeat", "app.launch", "screen.capture"})
         ):
@@ -186,6 +225,17 @@ def load_credentials() -> dict[str, object] | None:
         raise HubClientError("Local Hub credentials failed validation; no network request was sent.") from exc
     return result
 
+
+def _delete_credentials() -> None:
+    if platform.system() == "Windows":
+        from el_agent.credential_store import delete_credentials
+        try:
+            delete_credentials()
+        except Exception as exc:
+            raise HubClientError("Could not remove Hub credentials from Windows Credential Manager.") from exc
+    path = credentials_path()
+    if path.exists():
+        path.unlink()
 
 def pair_device(hub_url: str, pairing_code: str) -> dict[str, object]:
     base_url = validate_hub_url(hub_url)
