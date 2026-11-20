@@ -15,7 +15,7 @@ object VoiceIntentResolver {
 
         val chatGpt = normalized.contains("چت جی پی تی") ||
             Regex("""(?<![a-z0-9])chatgpt(?![a-z0-9])""").containsMatchIn(normalized) ||
-            Regex("""(?<![a-z0-9])chat\\s*gpt(?![a-z0-9])""").containsMatchIn(normalized)
+            Regex("""(?<![a-z0-9])chat\s*gpt(?![a-z0-9])""").containsMatchIn(normalized)
         val browser = normalized.contains("مرورگر") ||
             Regex("""(?<![a-z0-9])browser(?![a-z0-9])""").containsMatchIn(normalized)
 
