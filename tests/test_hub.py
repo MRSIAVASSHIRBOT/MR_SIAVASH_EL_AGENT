@@ -224,3 +224,56 @@ def test_device_id_reset_requires_local_unpair_and_creates_new_identity(tmp_path
     assert result["previous_device_id"] == old_id
     assert result["device_id"] != old_id
     assert hub.get_device_id() == result["device_id"]
+
+
+def test_windows_legacy_credentials_migrate_to_vault_before_plaintext_delete(tmp_path, monkeypatch):
+    from el_agent import credential_store
+
+    _use_tmp_data_dir(monkeypatch, tmp_path)
+    fake_vault = {}
+
+    class FakeKeyring:
+        def get_password(self, service, username):
+            return fake_vault.get((service, username))
+
+        def set_password(self, service, username, password):
+            fake_vault[(service, username)] = password
+
+        def delete_password(self, service, username):
+            fake_vault.pop((service, username), None)
+
+    monkeypatch.setattr(hub.platform, "system", lambda: "Windows")
+    monkeypatch.setattr(credential_store, "_windows_keyring", lambda: FakeKeyring())
+    now = datetime.now(timezone.utc)
+    credentials = {
+        "hub_url": "https://hub.example.test",
+        "device_id": hub.get_device_id(),
+        "access_token": _token("a"),
+        "refresh_token": _token("r"),
+        "access_expires_at": (now + timedelta(minutes=10)).isoformat(),
+        "refresh_expires_at": (now + timedelta(days=10)).isoformat(),
+        "scopes": ["device.heartbeat"],
+    }
+    legacy = hub.credentials_path()
+    legacy.parent.mkdir(parents=True, exist_ok=True)
+    legacy.write_text(json.dumps(credentials), encoding="utf-8")
+
+    assert hub.load_credentials() == credentials
+    assert not legacy.exists()
+    assert len(fake_vault) == 1
+
+
+def test_heartbeat_accepts_additional_explicitly_granted_device_scopes(tmp_path, monkeypatch):
+    _use_tmp_data_dir(monkeypatch, tmp_path)
+    now = datetime.now(timezone.utc)
+    hub._save_credentials({
+        "hub_url": "https://hub.example.test",
+        "device_id": hub.get_device_id(),
+        "access_token": _token("a"),
+        "refresh_token": _token("r"),
+        "access_expires_at": (now + timedelta(minutes=10)).isoformat(),
+        "refresh_expires_at": (now + timedelta(days=10)).isoformat(),
+        "scopes": ["device.heartbeat", "app.launch"],
+    })
+    monkeypatch.setattr(hub, "urlopen", lambda *_args, **_kwargs: FakeResponse({"status": "ok"}))
+    assert hub.heartbeat_once()["status"] == "ok"
