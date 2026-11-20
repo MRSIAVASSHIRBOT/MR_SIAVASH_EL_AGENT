@@ -136,6 +136,8 @@ def execute_claimed(claimed: dict[str, Any]) -> dict[str, Any]:
             raise ValueError("Task lease expiry must include a timezone.")
     except (ValueError, TypeError) as exc:
         raise HubClientError("Hub task identity or lease contract is invalid.") from exc
+    if task.get("device_id") != credentials.get("device_id"):
+        raise HubClientError("Hub returned a task for a different device identity.")
 
     if not _utc_now() < lease_expires_at:
         return {
@@ -162,6 +164,7 @@ def execute_claimed(claimed: dict[str, Any]) -> dict[str, Any]:
         and isinstance(timeout, int)
         and 5 <= timeout <= MAX_TASK_TIMEOUT_SECONDS
     )
+    owner_confirmed = action != "screen.capture" or task.get("owner_confirmed") is True
 
     outcome = "succeeded"
     error_code = None
@@ -174,6 +177,8 @@ def execute_claimed(claimed: dict[str, Any]) -> dict[str, Any]:
         outcome, error_code = "failed", "permission_denied"
     elif not timeout_valid:
         outcome, error_code = "failed", "execution_failed"
+    elif not owner_confirmed:
+        outcome, error_code = "failed", "permission_denied"
     else:
         try:
             action_started = True
@@ -214,7 +219,7 @@ def execute_claimed(claimed: dict[str, Any]) -> dict[str, Any]:
         "task_id": task_id,
         "reported_status": reported_task.get("status"),
         "outcome_verified": reported_task.get("outcome_verified"),
-        "action_attempted": scope_allowed and timeout_valid,
+        "action_attempted": action_started,
     }
 
 
