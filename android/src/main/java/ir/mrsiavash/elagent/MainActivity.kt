@@ -242,6 +242,15 @@ class MainActivity : Activity() {
             setTextColor(Color.rgb(88, 218, 165))
         }, fieldParams())
         root.addView(Button(this).apply {
+            text = "مدیریت مدل‌های آفلاین · Whisper و LLM"
+            isAllCaps = false
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(15, 65, 43))
+            setTextColor(Color.rgb(225, 248, 235))
+            setOnClickListener {
+                startActivity(Intent(this@MainActivity, OfflineModelsActivity::class.java))
+            }
+        }, buttonParams())
+        root.addView(Button(this).apply {
             text = "Open ChatGPT"
             backgroundTintList = ColorStateList.valueOf(Color.rgb(13, 33, 25))
             setTextColor(Color.rgb(53, 214, 160))
