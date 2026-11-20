@@ -26,8 +26,6 @@ import androidx.work.WorkManager
 import java.time.Instant
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import java.time.Duration
-import java.time.Instant
 
 class MainActivity : Activity() {
     private val executor = Executors.newSingleThreadExecutor()
