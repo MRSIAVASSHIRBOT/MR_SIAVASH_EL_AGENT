@@ -407,7 +407,9 @@ def unpair_local() -> dict[str, object]:
 
 
 def reset_device_id() -> dict[str, object]:
-    if credentials_path().exists():
+    # Credentials may live in Windows Credential Manager rather than the
+    # legacy JSON path. Validate both storage backends before changing identity.
+    if load_credentials() is not None or credentials_path().exists():
         raise HubClientError("Run unpair first; reset is blocked while local Hub credentials remain.")
     path = device_id_path()
     previous = path.read_text(encoding="utf-8").strip() if path.exists() else None
