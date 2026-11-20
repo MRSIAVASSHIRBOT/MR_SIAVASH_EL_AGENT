@@ -330,6 +330,15 @@ class FreeProviderPlanRouter(
         for (provider in providers) {
             try {
                 val json = provider.generate(systemPrompt, userPrompt)
+                try {
+                    AgentPlanParser.parse(json)
+                } catch (_: IllegalArgumentException) {
+                    throw ProviderRequestException(
+                        provider.id,
+                        ProviderFailureKind.INVALID_RESPONSE,
+                        "خروجی مدل با ساختار طرح موردنیاز سازگار نبود."
+                    )
+                }
                 return RoutedPlanResponse(json, provider.id, provider.model)
             } catch (error: ProviderRequestException) {
                 failures += error
@@ -351,15 +360,31 @@ class FreeProviderPlanRouter(
         throw NoFreeProviderAvailableException(failures, retry)
     }
 
+    companion object {
+        val DEFAULT_PROVIDER_ORDER = listOf(
+            FreeProviderId.GEMINI,
+            FreeProviderId.GROQ,
+            FreeProviderId.OPENROUTER
+        )
+    }
+
     private fun configuredProviders(): List<StructuredPlanProvider> {
         val secureStore = store ?: throw IllegalStateException("SecureStore is required when providers are not injected.")
         val gemini = secureStore.providerApiKey(FreeProviderId.GEMINI.storageId)
         val groq = secureStore.providerApiKey(FreeProviderId.GROQ.storageId)
         val openRouter = secureStore.providerApiKey(FreeProviderId.OPENROUTER.storageId)
-        return buildList {
-            if (gemini.isNotBlank()) add(GeminiFreePlanProvider(gemini))
-            if (groq.isNotBlank()) add(GroqFreePlanProvider(groq))
-            if (openRouter.isNotBlank()) add(OpenRouterFreePlanProvider(openRouter))
+        val configured = mapOf(
+            FreeProviderId.GEMINI to gemini,
+            FreeProviderId.GROQ to groq,
+            FreeProviderId.OPENROUTER to openRouter
+        )
+        return DEFAULT_PROVIDER_ORDER.mapNotNull { provider ->
+            val key = configured[provider].orEmpty()
+            if (key.isBlank()) null else when (provider) {
+                FreeProviderId.GEMINI -> GeminiFreePlanProvider(key)
+                FreeProviderId.GROQ -> GroqFreePlanProvider(key)
+                FreeProviderId.OPENROUTER -> OpenRouterFreePlanProvider(key)
+            }
         }
     }
 }
