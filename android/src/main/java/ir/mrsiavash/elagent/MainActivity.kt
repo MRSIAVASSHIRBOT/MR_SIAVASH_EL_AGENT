@@ -191,7 +191,7 @@ class MainActivity : Activity() {
         }, buttonParams())
         plannerModel = EditText(this).apply {
             hint = "شناسهٔ مدل فعال در حساب API"
-            setText("gpt-4o-mini")
+            setText("gpt-6.1-terra")
             setTextColor(Color.WHITE)
             setHintTextColor(Color.rgb(145, 170, 158))
             setSingleLine(true)
