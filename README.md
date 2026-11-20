@@ -87,7 +87,7 @@ el-agent chat --mode hybrid "Compare local and cloud inference"
 el-agent ai-status
 ```
 
-Cloud keys are stored in the OS credential store, not in project files. The first online slice is text-only on Windows; it does not upload microphone audio, screenshots, files, or memory, and model text cannot execute tools. Android cloud inference and the secured cross-device Agent Gateway are not implemented yet.
+Cloud keys are stored in the OS credential store, not in project files. The Windows desktop and Android companion both support explicit online text requests. Windows uses the OS credential store; Android encrypts a user-entered API key with Android Keystore. Android Offline mode currently supports only the fixed local command allowlist (not an on-device LLM); Hybrid tries online first and falls back to those local commands. Neither platform uploads microphone audio, screenshots, files, or memory in this text-chat slice, and model text cannot execute tools. A shared Agent Gateway and full Android offline LLM remain future work.
 
 ## Voice assistant (Windows push-to-talk)
 
@@ -161,13 +161,13 @@ This startup option runs the loopback-only API in the background; it does not en
 
 The native Android project is in `android/`. It currently supports:
 - Stable per-installation device identity.
-- Android Keystore AES-GCM encryption for locally stored Hub credentials.
+- Android Keystore AES-GCM encryption for locally stored Hub credentials and the user-entered cloud API key.
 - Owner-initiated pairing using a short-lived code created in Hub; the owner chooses the granted scopes.
 - HTTPS-only Hub communication, short-lived access token refresh, and an on-demand heartbeat.
 - A WorkManager heartbeat constrained to an available network (Android may defer periodic work according to OS battery policy).
 - Explicit local launch of the installed ChatGPT app, with the official ChatGPT website as fallback, and a default-browser launch.
 
-The Android preview includes a foreground, button-initiated, on-device push-to-talk prototype on Android 12+ when the device provides an offline recognizer and Persian language support. Microphone permission is requested at runtime; each capture is limited to 15 seconds and listening stops when the activity leaves the foreground. It never falls back to cloud recognition. Only the fixed ChatGPT/browser aliases are executable. The Android preview does **not** yet provide screen capture, arbitrary app control, remote task dispatch, background UI launching, or shared memory. The current Hub task-dispatch API is still being developed separately; the Android client intentionally does not pretend that remote tasks are available yet.
+The Android preview includes a foreground, button-initiated, on-device push-to-talk prototype on Android 12+ when the device provides an offline recognizer and Persian language support. It also includes explicit Online text chat through the OpenAI API, with the user-entered API key encrypted by Android Keystore. Hybrid mode tries Online first and falls back only to the local fixed command allowlist. Offline mode does not yet include a local generative model. Speech errors 11 (service disconnected) and 12 (language unsupported) now have distinct Persian explanations. Microphone permission is requested at runtime; each capture is limited to 15 seconds and listening stops when the activity leaves the foreground. It never falls back to cloud recognition. Only the fixed ChatGPT/browser aliases are executable. The Android preview does **not** yet provide screen capture, arbitrary app control, remote task dispatch, background UI launching, or shared memory. The current Hub task-dispatch API is still being developed separately; the Android client intentionally does not pretend that remote tasks are available yet.
 
 Build a debug APK:
 ```bash
@@ -184,4 +184,4 @@ See docs/ROADMAP.md and docs/SECURITY.md. CI tests Windows and Linux with Python
 
 ## Status
 
-Windows version 0.2.0 provides owner-initiated Hub pairing, rotating scoped device credentials, and outbound heartbeat. Android companion preview 0.3.0 adds native pairing, encrypted credential storage, periodic heartbeat, and explicit local app launch. A clean Windows 11 installation and live screenshot/application-launch acceptance test are still required before calling desktop behavior verified. The scheduled ChatGPT shortcut opens ChatGPT only; sending prompts or automating a conversation is not implemented. Remote task dispatch, shared memory, browser extension, and cloud scheduling remain planned.
+Windows version 0.2.0 provides owner-initiated Hub pairing, rotating scoped device credentials, and outbound heartbeat. Android companion preview 0.4.0 adds native pairing, encrypted credential storage, periodic heartbeat, explicit local app launch, optional online text chat, and local command fallback. A clean Windows 11 installation and live screenshot/application-launch acceptance test are still required before calling desktop behavior verified. The scheduled ChatGPT shortcut opens ChatGPT only; sending prompts or automating a conversation is not implemented. Remote task dispatch, shared memory, browser extension, and cloud scheduling remain planned.
