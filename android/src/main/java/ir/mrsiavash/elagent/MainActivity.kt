@@ -10,6 +10,7 @@ import android.graphics.drawable.GradientDrawable
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.SystemClock
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.ContactsContract
@@ -25,6 +26,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import java.time.Instant
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
@@ -38,6 +40,7 @@ class MainActivity : Activity() {
     private lateinit var pairingCode: EditText
     private lateinit var voiceController: LocalVoiceController
     private lateinit var voiceButton: Button
+    private lateinit var taskButton: Button
     private var voiceActive = false
     private val recordAudioRequest = 4102
     private val fatherContactRequest = 4105
@@ -220,6 +223,36 @@ class MainActivity : Activity() {
                 }
             }
         }, buttonParams())
+        taskButton = Button(this).apply {
+            text = "Check Hub tasks"
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(27, 35, 50))
+            setTextColor(Color.rgb(104, 196, 218))
+            setOnClickListener {
+                val hub = HubClient(store)
+                if (!hub.isPaired()) {
+                    setStatus("ابتدا دستگاه را با Hub جفت کن.")
+                    return@setOnClickListener
+                }
+                isEnabled = false
+                setBusy("Checking for one owner-authorized task…")
+                executor.execute {
+                    val result = runCatching { hub.claimTask() }
+                    runOnUiThread {
+                        taskButton.isEnabled = true
+                        result.onSuccess { claim ->
+                            if (claim == null) {
+                                setStatus("No supported app.launch task is queued, or an unsupported task was safely rejected.")
+                            } else {
+                                showTaskApproval(claim)
+                            }
+                        }.onFailure { error ->
+                            setStatus(error.message ?: "Could not check Hub tasks.")
+                        }
+                    }
+                }
+            }
+        }
+        root.addView(taskButton, buttonParams())
         root = homeContent
         voiceButton = Button(this).apply {
             text = "🎙  صحبت با سیا"
@@ -830,6 +863,73 @@ class MainActivity : Activity() {
                     setStatus("خواندن فایل ناموفق بود.")
                 }
             }
+        }
+    }
+
+    private fun showTaskApproval(claim: AndroidDeviceTaskClaim) {
+        val appName = claim.app ?: "unknown"
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Hub task requires your approval")
+            .setMessage(
+                "The Hub has requested to open '$appName' on this device. " +
+                    "Nothing will happen unless you approve this request. " +
+                    "The task expires after ${claim.timeoutSeconds} seconds."
+            )
+            .setPositiveButton("Approve and continue") { _, _ ->
+                if (!Instant.now().isBefore(claim.leaseExpiresAt)) {
+                    setStatus("The Hub task lease expired before approval. No app was opened; Hub will reconcile the outcome as unknown.")
+                    return@setPositiveButton
+                }
+                val started = SystemClock.elapsedRealtime()
+                val launchResult = runCatching { launchAllowlisted(appName) }
+                val elapsed = SystemClock.elapsedRealtime() - started
+                if (launchResult.isSuccess) {
+                    setStatus("App launch requested. Reporting the outcome to Hub…")
+                    reportTaskOutcome(claim, true, null, elapsed)
+                } else {
+                    setStatus("This app is unavailable on Android. Reporting failure…")
+                    reportTaskOutcome(claim, false, "app_not_available", elapsed)
+                }
+            }
+            .setNegativeButton("Reject") { _, _ ->
+                setStatus("Task rejected. Reporting the decision to Hub…")
+                reportTaskOutcome(claim, false, "permission_denied", 0L)
+            }
+            .setOnCancelListener {
+                reportTaskOutcome(claim, false, "permission_denied", 0L)
+            }
+            .create()
+        dialog.show()
+    }
+
+    private fun reportTaskOutcome(
+        claim: AndroidDeviceTaskClaim,
+        succeeded: Boolean,
+        errorCode: String?,
+        durationMs: Long
+    ) {
+        if (!Instant.now().isBefore(claim.leaseExpiresAt)) {
+            setStatus("The Hub task lease expired. No outcome was replayed; Hub will reconcile it as unknown.")
+            return
+        }
+        executor.execute {
+            runCatching { HubClient(store).completeTask(claim, succeeded, errorCode, durationMs) }
+                .onSuccess {
+                    runOnUiThread {
+                        setStatus(
+                            if (succeeded) {
+                                "Hub recorded the app-launch result (device-reported, not independently verified)."
+                            } else {
+                                "Hub recorded the rejected or failed task."
+                            }
+                        )
+                    }
+                }
+                .onFailure { error ->
+                    runOnUiThread {
+                        setStatus("Could not report task outcome; Hub will expire the lease without replay: ${error.message}")
+                    }
+                }
         }
     }
 
