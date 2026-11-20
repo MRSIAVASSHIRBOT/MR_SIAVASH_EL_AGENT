@@ -27,6 +27,7 @@ def _claimed(action="app.launch", app="notepad", *, owner_confirmed=False, scope
             "timeout_seconds": 15,
         },
         "lease_token": "l" * 48,
+        "lease_expires_at": (datetime.now(timezone.utc) + timedelta(seconds=30)).isoformat(),
     }
 
 
@@ -43,13 +44,18 @@ def test_claim_one_uses_device_auth_and_returns_claim(monkeypatch):
 
     def fake_post(creds, path, payload):
         seen.update({"path": path, "payload": payload})
-        return {"task": {"task_id": "task-1"}, "lease_token": "x" * 48}
+        return {
+            "task": {"task_id": "00000000-0000-0000-0000-000000000002"},
+            "lease_token": "x" * 48,
+            "lease_expires_at": (datetime.now(timezone.utc) + timedelta(seconds=30)).isoformat(),
+        }
 
     monkeypatch.setattr(remote_tasks, "_post", fake_post)
     result = remote_tasks.claim_one()
 
     assert result["task"]["task_id"] == "task-1"
     assert result["lease_token"] == "x" * 48
+    assert datetime.fromisoformat(result["lease_expires_at"]) > datetime.now(timezone.utc)
     assert seen["path"] == "/devices/tasks/claim"
 
 
@@ -127,3 +133,61 @@ def test_unknown_action_is_never_executed(monkeypatch):
 
     assert launched == []
     assert result["reported_status"] == "reported_failed"
+
+
+def test_claim_one_rejects_expired_lease_before_action(monkeypatch):
+    credentials = _claimed()["credentials"]
+    monkeypatch.setattr(remote_tasks, "_active_credentials", lambda: credentials)
+    monkeypatch.setattr(
+        remote_tasks,
+        "_post",
+        lambda *_args, **_kwargs: {
+            "task": {"task_id": "00000000-0000-0000-0000-000000000002"},
+            "lease_token": "x" * 48,
+            "lease_expires_at": (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(),
+        },
+    )
+
+    with pytest.raises(remote_tasks.HubClientError, match="expired"):
+        remote_tasks.claim_one()
+
+
+def test_expired_lease_prevents_action_and_completion_post(monkeypatch):
+    claimed = _claimed()
+    claimed["lease_expires_at"] = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
+    launched = []
+    monkeypatch.setattr(remote_tasks, "launch_app", lambda alias: launched.append(alias))
+    monkeypatch.setattr(
+        remote_tasks, "_post",
+        lambda *_args, **_kwargs: pytest.fail("expired lease must not be reported"),
+    )
+
+    result = remote_tasks.execute_claimed(claimed)
+
+    assert launched == []
+    assert result["reported_status"] == "not_reported_lease_expired"
+    assert result["action_attempted"] is False
+
+
+def test_action_finishing_after_lease_expiry_is_not_reported_or_replayed(monkeypatch):
+    import time
+
+    claimed = _claimed()
+    claimed["lease_expires_at"] = (datetime.now(timezone.utc) + timedelta(milliseconds=20)).isoformat()
+    launched = []
+
+    def slow_launch(alias):
+        launched.append(alias)
+        time.sleep(0.04)
+
+    monkeypatch.setattr(remote_tasks, "launch_app", slow_launch)
+    monkeypatch.setattr(
+        remote_tasks, "_post",
+        lambda *_args, **_kwargs: pytest.fail("late task outcome must not be posted"),
+    )
+
+    result = remote_tasks.execute_claimed(claimed)
+
+    assert launched == ["notepad"]
+    assert result["reported_status"] == "not_reported_lease_expired"
+    assert result["action_attempted"] is True
