@@ -8,7 +8,9 @@
 - [x] SQLite-backed scheduled app launch, task listing, and cancellation
 - [x] Windows and Linux CI pass on Python 3.11 and 3.12
 - [ ] Clean Windows 11 installation and live acceptance test
-- [ ] Friendly desktop launcher and startup integration
+- [x] Friendly desktop control center with task management and ISO-8601 scheduling
+- [x] Deterministic Persian/English quick commands for a fixed safe allowlist
+- [ ] Windows startup integration and live acceptance test
 
 ## Hub integration
 - [ ] Owner-initiated single-use device pairing
