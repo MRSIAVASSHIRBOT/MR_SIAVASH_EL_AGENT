@@ -13,7 +13,6 @@ import java.util.concurrent.TimeUnit
 
 enum class FreeProviderId(val storageId: String, val label: String) {
     GEMINI("gemini", "Google Gemini"),
-    GROQ("groq", "Groq"),
     OPENROUTER("openrouter", "OpenRouter")
 }
 
@@ -143,56 +142,6 @@ private object ProviderHttp {
     }
 }
 
-/** OpenAI-compatible adapters use only provider-specific fixed HTTPS origins. */
-class GroqFreePlanProvider(
-    private val apiKey: String,
-    override val model: String = DEFAULT_MODEL,
-    private val client: OkHttpClient = ProviderHttp.client
-) : StructuredPlanProvider {
-    override val id = FreeProviderId.GROQ
-
-    init {
-        require(apiKey.length in 20..512 && apiKey.none { it.isWhitespace() }) { "کلید Groq نامعتبر است." }
-        require(model.matches(Regex("[A-Za-z0-9._:/-]{1,120}"))) { "شناسهٔ مدل Groq نامعتبر است." }
-    }
-
-    override fun generate(systemPrompt: String, userPrompt: String): String =
-        complete("https://api.groq.com/openai/v1/chat/completions", apiKey, model, systemPrompt, userPrompt, false)
-
-    private fun complete(endpoint: String, key: String, modelName: String, system: String, user: String, openRouter: Boolean): String {
-        val payload = JSONObject()
-            .put("model", modelName)
-            .put("messages", org.json.JSONArray()
-                .put(JSONObject().put("role", "system").put("content", system))
-                .put(JSONObject().put("role", "user").put("content", user)))
-            .put("max_tokens", 1400)
-            .put("temperature", 0.2)
-            .put("response_format", JSONObject().put("type", "json_object"))
-        val builder = Request.Builder()
-            .url(endpoint)
-            .header("Authorization", "Bearer " + key)
-            .header("Content-Type", "application/json")
-            .header("Accept", "application/json")
-            .post(payload.toString().toRequestBody(ProviderHttp.jsonMediaType))
-        if (openRouter) {
-            builder.header("HTTP-Referer", "https://github.com/MRSIAVASSHIRBOT/MR_SIAVASH_EL_AGENT")
-                .header("X-Title", "MR SIAVASH EL AGENT")
-        }
-        client.newCall(builder.build()).execute().use { response ->
-            if (response.code in 300..399) {
-                throw ProviderRequestException(id, ProviderFailureKind.AUTHENTICATION, "تغییر مسیر سرویس برای حفاظت از کلید API رد شد.")
-            }
-            val raw = if (response.isSuccessful) ProviderHttp.readBounded(response) else ProviderHttp.errorBody(response)
-            if (!response.isSuccessful) ProviderHttp.fail(id, response, raw)
-            return ProviderHttp.parseChatCompletion(id, raw)
-        }
-    }
-
-    companion object {
-        const val DEFAULT_MODEL = "openai/gpt-oss-20b"
-    }
-}
-
 class OpenRouterFreePlanProvider(
     private val apiKey: String,
     override val model: String = DEFAULT_MODEL,
@@ -308,7 +257,7 @@ class NoFreeProviderAvailableException(
     val retryAfterSeconds: Long?
 ) : IllegalStateException(
     if (providerErrors.isEmpty()) {
-        "هیچ کلید API رایگان ذخیره نشده است. ابتدا حداقل یک کلید Gemini، Groq یا OpenRouter را ذخیره کنید."
+        "هیچ کلید API رایگان ذخیره نشده است. ابتدا کلید Gemini یا OpenRouter را ذخیره کنید."
     } else {
         "هیچ‌یک از سرویس‌های رایگان در دسترس نیستند: " +
             providerErrors.joinToString("؛ ") {
@@ -354,6 +303,12 @@ class FreeProviderPlanRouter(
                     ProviderFailureKind.INVALID_RESPONSE,
                     error.message?.take(160) ?: "پاسخ سرویس قابل‌استفاده نبود."
                 )
+            } catch (_: Exception) {
+                failures += ProviderRequestException(
+                    provider.id,
+                    ProviderFailureKind.INVALID_RESPONSE,
+                    "پاسخ سرویس قابل‌استفاده نبود."
+                )
             }
         }
         val retry = failures.mapNotNull { it.retryAfterSeconds }.minOrNull()
@@ -363,7 +318,6 @@ class FreeProviderPlanRouter(
     companion object {
         val DEFAULT_PROVIDER_ORDER = listOf(
             FreeProviderId.GEMINI,
-            FreeProviderId.GROQ,
             FreeProviderId.OPENROUTER
         )
     }
@@ -371,18 +325,15 @@ class FreeProviderPlanRouter(
     private fun configuredProviders(): List<StructuredPlanProvider> {
         val secureStore = store ?: throw IllegalStateException("SecureStore is required when providers are not injected.")
         val gemini = secureStore.providerApiKey(FreeProviderId.GEMINI.storageId)
-        val groq = secureStore.providerApiKey(FreeProviderId.GROQ.storageId)
         val openRouter = secureStore.providerApiKey(FreeProviderId.OPENROUTER.storageId)
         val configured = mapOf(
             FreeProviderId.GEMINI to gemini,
-            FreeProviderId.GROQ to groq,
             FreeProviderId.OPENROUTER to openRouter
         )
         return DEFAULT_PROVIDER_ORDER.mapNotNull { provider ->
             val key = configured[provider].orEmpty()
             if (key.isBlank()) null else when (provider) {
                 FreeProviderId.GEMINI -> GeminiFreePlanProvider(key)
-                FreeProviderId.GROQ -> GroqFreePlanProvider(key)
                 FreeProviderId.OPENROUTER -> OpenRouterFreePlanProvider(key)
             }
         }
