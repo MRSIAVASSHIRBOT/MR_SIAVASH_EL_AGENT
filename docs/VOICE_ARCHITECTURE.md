@@ -1,6 +1,6 @@
 # Voice Intelligence Architecture
 
-**Status:** Approved product direction. V1 push-to-talk is implemented on the Windows desktop path; wake-word, Android voice, and cloud inference remain planned.
+**Status:** Approved product direction. Windows V1 push-to-talk code and all four CI matrix jobs pass; physical microphone and Persian TTS acceptance remain pending. Wake-word, Android voice, and cloud inference remain planned.
 
 ## Product decisions
 
