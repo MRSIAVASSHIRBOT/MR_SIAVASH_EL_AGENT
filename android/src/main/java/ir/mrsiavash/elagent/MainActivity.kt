@@ -151,8 +151,8 @@ class MainActivity : Activity() {
             }
         }, buttonParams())
         cloudModel = EditText(this).apply {
-            hint = "Cloud model (default: gpt-4o-mini)"
-            setText("gpt-4o-mini")
+            hint = "Cloud model (default: gpt-6-luna)"
+            setText("gpt-6-luna")
             setTextColor(Color.WHITE)
             setHintTextColor(Color.rgb(145, 170, 158))
             setSingleLine(true)
