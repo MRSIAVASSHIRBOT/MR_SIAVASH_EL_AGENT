@@ -49,3 +49,16 @@ No item is complete until code, tests, privacy review, and platform acceptance e
 - [x] Scheduler startup reconciles interrupted rows before claiming new work.
 - [x] The local scheduler runs app-launch work off the event loop and leaves interrupted executions unreplayed.
 - [ ] Physical Windows 11 restart/offline acceptance remains pending.
+
+## Android capability expansion (in progress)
+
+- [x] Define a typed catalog of Android capability areas and action-scoped authorization evidence.
+- [x] Add Storage Access Framework document selection and bounded local text preview UI.
+- [x] Add JVM tests for per-capability grants, action-specific confirmation, task identity, MIME policy, UTF-8 validation, and size limits.
+- [ ] Validate the latest exact-head Android CI and debug APK artifact.
+- [ ] Perform physical-device file-provider acceptance on Android 8+.
+- [ ] Integrate typed action planning with the provider layer and optional Hub task dispatch.
+- [ ] Implement further adapters incrementally: share sheet, calendar/reminders, notification opt-in, camera, screen capture, location, contacts, and visible accessibility automation.
+
+The checkboxes above describe code/test coverage, not general Android permissions being active. Every platform capability must remain unavailable until its corresponding adapter, OS authorization UX, tests, and device acceptance are complete.
+
