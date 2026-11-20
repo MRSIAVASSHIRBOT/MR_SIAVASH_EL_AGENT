@@ -12,6 +12,10 @@ class VoiceIntentResolverTest {
         assertEquals("chatgpt", VoiceIntentResolver.resolve("open ChatGPT"))
     }
 
+    @Test fun resolvesSpacedEnglishChatGptPhrase() {
+        assertEquals("chatgpt", VoiceIntentResolver.resolve("open Chat GPT"))
+    }
+
     @Test fun resolvesPersianBrowserPhrase() {
         assertEquals("browser", VoiceIntentResolver.resolve("مرورگر را باز کن"))
     }
