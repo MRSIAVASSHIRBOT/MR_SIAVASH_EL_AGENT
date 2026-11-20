@@ -75,17 +75,3 @@ async def hub_task_loop() -> None:
     """Consume Hub-authorized device tasks with bounded action contracts."""
     from el_agent.remote_tasks import hub_task_loop as run_remote_tasks
     await run_remote_tasks()
-
-
-async def hub_heartbeat_loop() -> None:
-    """Synchronize only minimal device health metadata with the paired Hub."""
-    from el_agent.hub import HEARTBEAT_INTERVAL_SECONDS, HubClientError, heartbeat_once
-
-    while True:
-        try:
-            await asyncio.to_thread(heartbeat_once)
-        except HubClientError as exc:
-            logger.warning("Hub heartbeat unavailable: %s", exc)
-        except Exception:
-            logger.exception("Unexpected Hub heartbeat failure")
-        await asyncio.sleep(HEARTBEAT_INTERVAL_SECONDS)
