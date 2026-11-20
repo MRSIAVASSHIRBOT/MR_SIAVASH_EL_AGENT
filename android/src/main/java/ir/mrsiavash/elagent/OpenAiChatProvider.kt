@@ -136,6 +136,10 @@ class OpenAiChatProvider(
             }
             val message = choice.optJSONObject("message")
                 ?: throw IllegalStateException("Cloud provider returned no message object.")
+            val refusal = message.opt("refusal") as? String
+            if (!refusal.isNullOrBlank()) {
+                throw IllegalStateException("The model declined to produce a plan.")
+            }
             val content = message.opt("content") as? String
             if (content.isNullOrBlank()) throw IllegalStateException("Cloud model returned no text.")
             return content.trim()
