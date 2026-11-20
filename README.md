@@ -68,6 +68,27 @@ Cancel a pending task:
 
     .\.venv\Scripts\el-agent.exe cancel TASK_ID
 
+## Text intelligence (Windows first slice)
+
+The provider layer supports explicit `local`, `online`, and `hybrid` text chat. Local is the default. See [docs/PROVIDER_SETUP.md](docs/PROVIDER_SETUP.md) before configuring cloud access.
+
+```powershell
+# Local Ollama; no prompt is sent to a cloud provider
+el-agent chat --mode local "سلام، خودت را معرفی کن"
+
+# Optional cloud API (requires a separately billed API account/key)
+python -m pip install -e ".[cloud]"
+$env:EL_AGENT_CLOUD_MODEL = "YOUR_SUPPORTED_API_MODEL"
+el-agent provider-key set
+el-agent chat --mode online "Explain hybrid AI"
+
+# Cloud-first with local Ollama fallback
+el-agent chat --mode hybrid "Compare local and cloud inference"
+el-agent ai-status
+```
+
+Cloud keys are stored in the OS credential store, not in project files. The first online slice is text-only on Windows; it does not upload microphone audio, screenshots, files, or memory, and model text cannot execute tools. Android cloud inference and the secured cross-device Agent Gateway are not implemented yet.
+
 ## Voice assistant (Windows push-to-talk)
 
 The first voice release is opt-in and local-only. It does not keep the microphone open, detect the wake word, or upload audio.
