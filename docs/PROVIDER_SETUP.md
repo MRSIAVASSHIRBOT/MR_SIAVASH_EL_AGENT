@@ -8,7 +8,7 @@ The assistant's first text-intelligence slice supports a local Ollama provider a
 - `online`: use the official OpenAI API. Requires a separately provisioned API key and may incur API charges. ChatGPT subscriptions do not include API credits.
 - `hybrid`: try the configured online provider first, then fall back to local Ollama if the online provider fails. The response indicates whether fallback occurred.
 
-The current CLI is explicit per request; it does not silently switch modes. The authenticated loopback API exposes the same contract. This first slice does not yet add Android cloud inference or cross-device inference; those require the separately designed Agent Gateway and Android client integration.
+The Windows CLI/desktop UI and Android UI select modes explicitly; there is no silent cloud fallback from local-only mode. The authenticated Windows loopback API exposes the same contract. Android currently calls the official API directly using a user-entered key encrypted by Android Keystore; a shared Agent Gateway is a later option, not a required runtime dependency.
 
 ## Install cloud credential support (Windows)
 
@@ -43,12 +43,22 @@ el-agent ai-status
 
 Set `EL_AGENT_OLLAMA_MODEL` to change the local model (default `llama3.1:8b`). Set `EL_AGENT_CLOUD_MODEL` to a model enabled for the API account. Model availability, API pricing, quotas, and regional availability are controlled by the provider.
 
+## Android setup
+
+1. Open the Android app and enter your own API key in the **OpenAI API key** field.
+2. Tap **ذخیره امن کلید آنلاین**. The app stores the key in its encrypted local payload using an AES-GCM key held by Android Keystore; the field is cleared afterward.
+3. Keep the model field at `gpt-4o-mini` or enter a model enabled for the API account.
+4. Select **Online** to send the typed message to the API, **Offline** to use only the fixed local command allowlist, or **Hybrid** to try Online first and fall back to the local allowlist if the API fails.
+5. Use **حذف کلید آنلاین** to remove the stored key.
+
+Android Hybrid is not yet an offline generative model: if cloud inference fails, only explicit ChatGPT/browser launch phrases are supported locally. Android push-to-talk remains on-device-only and does not send audio to the cloud. API usage may incur separate charges; a ChatGPT subscription does not include API credits.
+
 ## Privacy and safety
 
 - Local mode targets only the loopback Ollama endpoint.
 - The online adapter targets only the official HTTPS API endpoint and refuses redirects to avoid forwarding credentials.
 - Requests are user-initiated, bounded to 8,000 characters, and responses are bounded to 1 MB.
-- API keys are retrieved from the OS keyring and are never returned by status commands or included in logs/errors.
-- No microphone audio, screenshots, files, memory, or device telemetry are sent by this text-only adapter.
+- Windows API keys are retrieved from the native OS keyring and are never returned by status commands or included in logs/errors. Android keys are encrypted at rest with Android Keystore and never embedded in the APK.
+- No microphone audio, screenshots, files, memory, or device telemetry are sent by this text-only adapter. Android speech recognition remains on-device.
 - No provider output can invoke tools. Tool planning and execution require a separate typed action proposal, deterministic policy check, and explicit confirmation where applicable.
 - Hybrid mode may send the entered prompt to the configured cloud provider before local fallback. Use local mode for sensitive content.
