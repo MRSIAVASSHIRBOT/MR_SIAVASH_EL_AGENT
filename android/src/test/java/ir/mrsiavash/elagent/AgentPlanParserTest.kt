@@ -9,10 +9,7 @@ class AgentPlanParserTest {
 
     @Test fun parsesSupportedAppLaunchAndDisplayText() {
         val parsed = AgentPlanParser.parse(
-            plan(
-                """{"id":"open_chat","operation":"open_app","target":"chatgpt","depends_on":[]}""",
-                """,
-                """)
+            plan("""{"id":"open_chat","operation":"open_app","target":"chatgpt","depends_on":[]}""")
         )
         assertEquals(1, parsed.steps.size)
         assertEquals(AgentOperation.OPEN_APP, parsed.steps[0].operation)
