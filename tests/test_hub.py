@@ -202,3 +202,25 @@ def test_corrupt_stored_hub_url_fails_before_any_network_request(tmp_path, monke
     monkeypatch.setattr(hub, "urlopen", lambda *_args, **_kwargs: pytest.fail("credentials must be rejected before network"))
     with pytest.raises(hub.HubClientError, match="failed validation"):
         hub.heartbeat_once()
+
+
+def test_device_id_reset_requires_local_unpair_and_creates_new_identity(tmp_path, monkeypatch):
+    _use_tmp_data_dir(monkeypatch, tmp_path)
+    old_id = hub.get_device_id()
+    now = datetime.now(timezone.utc)
+    hub._save_credentials({
+        "hub_url": "https://hub.example.test",
+        "device_id": old_id,
+        "access_token": _token("a"),
+        "refresh_token": _token("r"),
+        "access_expires_at": (now + timedelta(minutes=10)).isoformat(),
+        "refresh_expires_at": (now + timedelta(days=10)).isoformat(),
+        "scopes": ["device.heartbeat"],
+    })
+    with pytest.raises(hub.HubClientError, match="Run unpair first"):
+        hub.reset_device_id()
+    hub.unpair_local()
+    result = hub.reset_device_id()
+    assert result["previous_device_id"] == old_id
+    assert result["device_id"] != old_id
+    assert hub.get_device_id() == result["device_id"]
