@@ -73,6 +73,32 @@ class SecureStore(private val context: android.content.Context) {
         write(value)
     }
 
+    /** Provider-specific keys are kept inside the same Android Keystore AES-GCM encrypted payload. */
+    @Synchronized
+    fun saveProviderApiKey(providerId: String, apiKey: String) {
+        require(providerId in setOf("gemini", "groq", "openrouter")) { "Unsupported free provider." }
+        require(apiKey.length in 20..512 && apiKey.none { it.isWhitespace() }) {
+            "Provider API key is invalid."
+        }
+        val value = read()
+        value.put("free_provider_" + providerId + "_api_key", apiKey)
+        write(value)
+    }
+
+    @Synchronized
+    fun providerApiKey(providerId: String): String {
+        require(providerId in setOf("gemini", "groq", "openrouter")) { "Unsupported free provider." }
+        return read().optString("free_provider_" + providerId + "_api_key", "")
+    }
+
+    @Synchronized
+    fun clearProviderApiKey(providerId: String) {
+        require(providerId in setOf("gemini", "groq", "openrouter")) { "Unsupported free provider." }
+        val value = read()
+        value.remove("free_provider_" + providerId + "_api_key")
+        write(value)
+    }
+
     fun clearCredentialsPreservingIdentity() {
         val value = read()
         value.remove("hub_url")
