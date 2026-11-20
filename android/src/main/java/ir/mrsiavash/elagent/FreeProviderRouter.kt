@@ -76,7 +76,7 @@ object ProviderFailurePolicy {
     }
 }
 
-private object ProviderHttp {
+internal object ProviderHttp {
     val client: OkHttpClient = OkHttpClient.Builder()
         .callTimeout(45, TimeUnit.SECONDS)
         .connectTimeout(12, TimeUnit.SECONDS)
@@ -115,12 +115,17 @@ private object ProviderHttp {
     fun fail(provider: FreeProviderId, response: okhttp3.Response, rawBody: String): Nothing {
         val kind = ProviderFailurePolicy.classify(response.code, rawBody)
         val retryAfter = ProviderFailurePolicy.retryAfterSeconds(response.header("Retry-After"))
-        throw ProviderRequestException(
-            provider,
-            kind,
-            ProviderFailurePolicy.userFacing(kind),
-            retryAfter
-        )
+        val providerMessage = runCatching {
+            val error = JSONObject(rawBody).optJSONObject("error")
+            (error?.optString("message") ?: JSONObject(rawBody).optString("message"))
+                .takeIf { it.isNotBlank() && it != "null" }
+                ?.replace(Regex("\\s+"), " ")
+                ?.take(140)
+        }.getOrNull()
+        val diagnostic = ProviderFailurePolicy.userFacing(kind) +
+            " · HTTP ${response.code}" +
+            (providerMessage?.let { " · $it" } ?: "")
+        throw ProviderRequestException(provider, kind, diagnostic, retryAfter)
     }
 
     fun parseChatCompletion(provider: FreeProviderId, raw: String): String {
@@ -138,7 +143,18 @@ private object ProviderHttp {
         if (content.isEmpty()) {
             throw ProviderRequestException(provider, ProviderFailureKind.INVALID_RESPONSE, "مدل خروجی متنی تولید نکرد.")
         }
-        return content
+        // Free models do not consistently support response_format/json_object. Ask for JSON
+        // in the prompt, then tolerate common Markdown fences or a short prose preamble.
+        val unfenced = content
+            .replace(Regex("^\\s*```(?:json)?\\s*", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("\\s*```\\s*$"), "")
+            .trim()
+        val firstBrace = unfenced.indexOf('{')
+        val lastBrace = unfenced.lastIndexOf('}')
+        if (firstBrace < 0 || lastBrace <= firstBrace) {
+            throw ProviderRequestException(provider, ProviderFailureKind.INVALID_RESPONSE, "مدل JSON قابل‌استخراج تولید نکرد.")
+        }
+        return unfenced.substring(firstBrace, lastBrace + 1)
     }
 }
 
@@ -162,9 +178,8 @@ class OpenRouterFreePlanProvider(
             .put("messages", org.json.JSONArray()
                 .put(JSONObject().put("role", "system").put("content", systemPrompt))
                 .put(JSONObject().put("role", "user").put("content", userPrompt)))
-            .put("max_tokens", 1400)
+            .put("max_tokens", 1800)
             .put("temperature", 0.2)
-            .put("response_format", JSONObject().put("type", "json_object"))
         val request = Request.Builder()
             .url("https://openrouter.ai/api/v1/chat/completions")
             .header("Authorization", "Bearer " + apiKey)
