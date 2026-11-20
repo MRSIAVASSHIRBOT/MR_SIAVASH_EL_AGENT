@@ -193,7 +193,7 @@ class OfflineModelsActivity : Activity() {
             return
         }
         cancelWhisperCapture = false
-        status.text = "میکروفون فعال است؛ ضبط با درخواست تو و حداکثر تا ۸ ثانیه انجام می‌شود…"
+        status.text = "در حال آماده‌سازی موتور تشخیص گفتار آفلاین…"
         ioExecutor.execute {
             val result = runCatching {
                 val manager = getSystemService(ACTIVITY_SERVICE) as ActivityManager
@@ -210,6 +210,9 @@ class OfflineModelsActivity : Activity() {
                     throw IllegalStateException("بارگذاری مدل Whisper ناموفق بود.")
                 }
                 try {
+                    runOnUiThread {
+                        status.text = "اکنون صحبت کن؛ میکروفون فعال است و ضبط حداکثر ۸ ثانیه ادامه دارد."
+                    }
                     val samples = captureWhisperAudio()
                     if (samples.isEmpty()) throw IllegalStateException("ضبط صدا کامل نشد یا لغو شد.")
                     NativeWhisperRuntime.transcribe(samples, threads = 2)
@@ -249,26 +252,28 @@ class OfflineModelsActivity : Activity() {
             throw IllegalStateException("راه‌اندازی میکروفون ناموفق بود.")
         }
 
-        val collected = ArrayList<Short>(maxSamples)
+        val collected = ShortArray(maxSamples)
+        var collectedCount = 0
         val buffer = ShortArray(2048)
         try {
             recorder.startRecording()
-            while (collected.size < maxSamples && !cancelWhisperCapture) {
-                val count = recorder.read(buffer, 0, minOf(buffer.size, maxSamples - collected.size))
+            while (collectedCount < maxSamples && !cancelWhisperCapture) {
+                val count = recorder.read(buffer, 0, minOf(buffer.size, maxSamples - collectedCount))
                 if (count == AudioRecord.ERROR_DEAD_OBJECT || count == AudioRecord.ERROR_INVALID_OPERATION ||
                     count == AudioRecord.ERROR_BAD_VALUE) {
                     throw IllegalStateException("خواندن داده از میکروفون ناموفق بود.")
                 }
                 if (count > 0) {
-                    for (i in 0 until count) collected.add(buffer[i])
+                    buffer.copyInto(collected, destinationOffset = collectedCount, startIndex = 0, endIndex = count)
+                    collectedCount += count
                 }
             }
         } finally {
             runCatching { recorder.stop() }
             recorder.release()
         }
-        if (cancelWhisperCapture || collected.size < sampleRate / 2) return FloatArray(0)
-        return FloatArray(collected.size) { index -> collected[index] / 32768.0f }
+        if (cancelWhisperCapture || collectedCount < sampleRate / 2) return FloatArray(0)
+        return FloatArray(collectedCount) { index -> collected[index] / 32768.0f }
     }
 
     private fun showLlmPrompt() {
