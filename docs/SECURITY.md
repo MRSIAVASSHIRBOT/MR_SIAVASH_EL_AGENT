@@ -7,3 +7,12 @@ Allowed operations are explicit screenshot capture, launching a fixed applicatio
 Arbitrary shell or script execution, caller-supplied executable paths and URLs, keystroke logging, hidden capture, microphone recording, credential collection, unrestricted file access, unattended messaging/publishing/purchases, and non-loopback network exposure are excluded.
 
 Run as the normal desktop user, not elevated administrator. Keep the token private. Screenshot files remain local under the application data directory. Do not expose the token to browser JavaScript. Optional Hub pairing uses a five-minute owner-created one-time challenge, short-lived device access credentials, rotating refresh credentials, owner-side revocation, and a heartbeat scope only. The companion sends only device ID, agent version, runtime state, and uptime to the configured Hub. It never forwards the local API token. HTTP Hub URLs are accepted only for localhost; external Hub origins must use HTTPS. The local device credential file is stored under the current user's application-data directory. Hub task dispatch and shared-memory synchronization are not yet enabled.
+
+
+## Text provider boundary
+
+- Local inference is the default and targets only the loopback Ollama endpoint.
+- Online and hybrid inference require explicit mode selection; cloud credentials are stored only in a supported OS credential store.
+- The online adapter uses a fixed HTTPS endpoint, refuses redirects, bounds request/response sizes, and does not expose keys in logs or error messages.
+- Model output is display-only. It is never passed to a shell, script runner, application launcher, or device-action executor.
+- Microphone audio, screenshots, files, Hub memory, and device telemetry are not included in text-provider requests.
