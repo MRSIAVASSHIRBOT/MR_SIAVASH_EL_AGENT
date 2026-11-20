@@ -137,8 +137,11 @@ def _save_credentials(credentials: dict[str, object]) -> None:
         from el_agent.credential_store import save_credentials
         try:
             save_credentials(credentials)
+            legacy_path = credentials_path()
+            if legacy_path.exists():
+                legacy_path.unlink()
         except Exception as exc:
-            raise HubClientError("Hub credentials could not be stored securely in Windows Credential Manager.") from exc
+            raise HubClientError("Hub credentials could not be stored securely or legacy plaintext credentials could not be removed.") from exc
         return
     path = credentials_path()
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -163,7 +166,13 @@ def _read_credentials_raw() -> dict[str, object] | None:
         from el_agent.credential_store import load_credentials, save_credentials
         try:
             stored = load_credentials()
+            legacy_path = credentials_path()
             if stored is not None:
+                if legacy_path.exists():
+                    legacy = json.loads(legacy_path.read_text(encoding="utf-8"))
+                    if legacy != stored:
+                        raise HubClientError("Windows vault and legacy credential file differ; manual review is required.")
+                    legacy_path.unlink()
                 return stored
             # One-time migration: move an existing legacy JSON record into
             # Credential Manager, then remove the plaintext file only after
