@@ -1,5 +1,6 @@
 package ir.mrsiavash.elagent
 
+import android.content.Intent
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -15,6 +16,14 @@ class DocumentAccessPolicyTest {
         assertFalse(DocumentAccessPolicy.isSupportedTextMimeType("application/pdf"))
         assertFalse(DocumentAccessPolicy.isSupportedTextMimeType("image/png"))
         assertFalse(DocumentAccessPolicy.isSupportedTextMimeType(null))
+    }
+
+    @Test fun persistsOnlyWhenProviderReturnsBothReadAndPersistableFlags() {
+        assertTrue(DocumentAccessPolicy.canPersistReadPermission(
+            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+        ))
+        assertFalse(DocumentAccessPolicy.canPersistReadPermission(Intent.FLAG_GRANT_READ_URI_PERMISSION))
+        assertFalse(DocumentAccessPolicy.canPersistReadPermission(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION))
     }
 
     @Test fun decodesUtf8Text() {
