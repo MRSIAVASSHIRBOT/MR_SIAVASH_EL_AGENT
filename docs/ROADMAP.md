@@ -6,6 +6,8 @@
 - [x] Explicit screenshot endpoint
 - [x] Allowlisted application launch, including fixed ChatGPT URL shortcut
 - [x] SQLite-backed scheduled app launch, task listing, and cancellation
+- [x] Restart recovery fences interrupted launches as unknown_outcome without replay
+- [x] Pending tasks more than 24 hours overdue are marked missed; recent due tasks remain eligible
 - [x] Windows and Linux CI pass on Python 3.11 and 3.12
 - [ ] Clean Windows 11 installation and live acceptance test
 - [x] Friendly desktop control center with task management and ISO-8601 scheduling
@@ -52,9 +54,17 @@ No item is complete until code, tests, privacy review, and platform acceptance e
 |---|---|---|
 | 1. Core integration | Hub pairing, stable device identity, heartbeat, owner-scoped task contract on Hub PR #460, scoped consumer client on this branch | Deploy merged Hub task API; live owner pairing with least-privilege scopes; verify revocation and task audit |
 | 2. Windows Agent | Loopback API, bearer auth, explicit screenshot, allowlisted app launch, desktop UI, local scheduler, Hub task consumer implementation | Clean Windows 11 install, real screenshot/app launch, remote task round-trip and recovery on the owner's machine |
-| 3. Autonomous Scheduler | Durable local scheduler and Hub-side scheduled queue contract | Live scheduled execution, missed-task reconciliation, bounded retry and expiry tests across restart/offline windows |
+| 3. Autonomous Scheduler | Durable local scheduler, restart recovery, uncertain-outcome fencing, and 24-hour missed-deadline classification; Hub-side scheduled queue contract | Physical Windows 11 restart/offline acceptance and a live Hub task scheduling/expiry round-trip |
 | 4. Android & Browser | Android pairing, encrypted Keystore credentials, heartbeat, local voice, and foreground-only owner-approved Hub app.launch flow | Physical Android acceptance; background task scheduling, screenshot capture, and browser extension remain unimplemented |
 | 5. Digital Representative | Deterministic Persian/English intents and local voice command routing | Owner-approved preference memory, bounded planning, multi-mission state and evidence-based self-evaluation |
 | 6. Ecosystem Integration | Hub and website public Gateway contracts exist; three repositories remain separated by explicit trust boundaries | Dashboard device/task views, controlled cross-project memory API, multi-device orchestration and end-to-end acceptance |
 
 Phase completion is evidence-gated. GitHub CI does not substitute for physical Windows/Android acceptance, live Hub deployment, or production integration. No live device operation or production deployment is claimed by this source change.
+
+## Scheduler recovery acceptance
+
+- [x] Unit tests cover interrupted-running reconciliation, overdue-task expiry, one-time claiming, and normal finish states.
+- [x] Scheduler startup reconciles interrupted rows before claiming new work.
+- [x] The local scheduler runs app-launch work off the event loop and leaves interrupted executions unreplayed.
+- [ ] Physical Windows 11 restart/offline acceptance remains pending.
+

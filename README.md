@@ -68,6 +68,14 @@ Cancel a pending task:
 
     .\.venv\Scripts\el-agent.exe cancel TASK_ID
 
+### Scheduler recovery policy
+
+- Pending tasks execute when due, including after a short device restart/offline window.
+- A task more than 24 hours overdue is marked `missed` and is not launched unexpectedly.
+- A task left in `running` after a process restart is marked `unknown_outcome`; it is never replayed because the previous launch may already have taken effect.
+- Use `el-agent tasks` to inspect the final status. Unknown outcomes require owner review; the scheduler will not guess or retry.
+
+
 ## Voice assistant (Windows push-to-talk)
 
 The first voice release is opt-in and local-only. It does not keep the microphone open, detect the wake word, or upload audio.
