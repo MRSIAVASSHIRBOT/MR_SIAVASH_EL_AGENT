@@ -169,6 +169,36 @@ class MainActivity : Activity() {
     }
 
 
+    @Suppress("DEPRECATION")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != openDocumentRequest || resultCode != RESULT_OK) return
+        val uri = data?.data ?: run {
+            setStatus("فایلی انتخاب نشد.")
+            return
+        }
+        val resultFlags = data.flags
+        setBusy("در حال خواندن فایل انتخاب‌شده به‌صورت محلی…")
+        executor.execute {
+            val result = runCatching {
+                val preview = AndroidDocumentAccess.readTextPreview(contentResolver, uri)
+                val persisted = runCatching {
+                    AndroidDocumentAccess.persistReadPermission(contentResolver, uri, resultFlags)
+                }.getOrDefault(false)
+                preview to persisted
+            }
+            runOnUiThread {
+                result.onSuccess { (preview, persisted) ->
+                    documentPreview.text = "نوع فایل: ${preview.mimeType}\nحجم خوانده‌شده: ${preview.bytesRead} بایت\nدسترسی پایدار: ${if (persisted) "بله" else "خیر؛ فقط دسترسی موقت انتخاب‌گر"}\n\n${preview.text}"
+                    setStatus("پیش‌نمایش فایل فقط روی همین دستگاه آماده شد؛ هیچ محتوایی ارسال نشد.")
+                }.onFailure { error ->
+                    documentPreview.text = "پیش‌نمایش در دسترس نیست: ${error.message ?: "خطای نامشخص"}"
+                    setStatus("خواندن فایل ناموفق بود.")
+                }
+            }
+        }
+    }
+
     private fun toggleVoice() {
         if (voiceActive) {
             voiceController.stop()
