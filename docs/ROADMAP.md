@@ -29,7 +29,8 @@
 - [ ] Persian Windows speech voice quality and microphone device acceptance
 - [x] Android push-to-talk prototype: runtime microphone permission, on-device recognizer only, foreground stop behavior, local TTS, and allowlisted ChatGPT/browser intents (Android 12+; Persian recognizer support is device-dependent)
 - [ ] Local Persian wake-word detection for «سیا» (explicit opt-in; no cloud ambient audio)
-- [ ] Hybrid cloud STT/LLM provider with explicit consent, quotas, and offline fallback
+- [x] Provider-neutral text LLM interfaces and Windows CLI/API modes (local Ollama, opt-in OpenAI API, hybrid fallback; Android/gateway/STT/TTS integration pending)
+- [ ] Cross-platform hybrid cloud STT/LLM through secured Agent Gateway with explicit consent, quotas, and offline fallback
 - [ ] Shared Android/Windows voice action contract and policy engine
 
 ## Adaptive representative
