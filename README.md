@@ -116,7 +116,7 @@ This startup option runs the loopback-only API in the background; it does not en
 
 ## Security boundaries
 
-- Loopback binding is enforced by the CLI; remote access is not implemented.
+- The local API is loopback-only; no inbound remote-control transport or remote task dispatch is implemented. Optional outbound Hub heartbeat is limited to minimal device health metadata.
 - Every control endpoint requires bearer authentication.
 - Screenshot capture is explicit and files remain on the local device.
 - Application launch is restricted to fixed aliases; no arbitrary shell, script, executable path, arguments, or caller-supplied URL is executed.
