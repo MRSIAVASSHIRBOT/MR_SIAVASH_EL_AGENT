@@ -21,6 +21,8 @@ The provider order is deterministic. Only providers with a locally saved key are
 - Only the typed planning request and fixed system prompt are sent. Files, microphone audio, screenshots, Hub credentials, and local memory are excluded.
 - When a provider fails, the same typed request may be sent to the next configured provider. Do not submit sensitive or confidential information.
 
+The Android client deliberately does not force OpenAI-compatible `response_format: json_object`, because some free models/providers do not support that parameter. It asks for JSON in the system prompt, accepts a JSON object wrapped in a Markdown code fence or a short preamble, and validates the extracted object locally before creating a plan. Provider HTTP status and a bounded provider error message are surfaced in the UI to make key, model, rate-limit, and request-shape failures distinguishable.
+
 ## Failure handling
 
 - HTTP 429 with a transient rate-limit response is classified separately from quota/billing exhaustion.
