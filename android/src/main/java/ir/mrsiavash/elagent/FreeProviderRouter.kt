@@ -319,7 +319,7 @@ class NoFreeProviderAvailableException(
 )
 
 class FreeProviderPlanRouter(
-    private val store: SecureStore,
+    private val store: SecureStore? = null,
     private val providersOverride: List<StructuredPlanProvider>? = null
 ) {
     fun generate(systemPrompt: String, userPrompt: String): RoutedPlanResponse {
@@ -352,9 +352,10 @@ class FreeProviderPlanRouter(
     }
 
     private fun configuredProviders(): List<StructuredPlanProvider> {
-        val gemini = store.providerApiKey(FreeProviderId.GEMINI.storageId)
-        val groq = store.providerApiKey(FreeProviderId.GROQ.storageId)
-        val openRouter = store.providerApiKey(FreeProviderId.OPENROUTER.storageId)
+        val secureStore = store ?: throw IllegalStateException("SecureStore is required when providers are not injected.")
+        val gemini = secureStore.providerApiKey(FreeProviderId.GEMINI.storageId)
+        val groq = secureStore.providerApiKey(FreeProviderId.GROQ.storageId)
+        val openRouter = secureStore.providerApiKey(FreeProviderId.OPENROUTER.storageId)
         return buildList {
             if (gemini.isNotBlank()) add(GeminiFreePlanProvider(gemini))
             if (groq.isNotBlank()) add(GroqFreePlanProvider(groq))
