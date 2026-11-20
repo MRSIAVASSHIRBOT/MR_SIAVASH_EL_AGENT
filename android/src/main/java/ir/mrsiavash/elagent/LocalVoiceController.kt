@@ -13,7 +13,8 @@ import java.util.Locale
 class LocalVoiceController(
     private val activity: Activity,
     private val onStatus: (String) -> Unit,
-    private val onTranscript: (String) -> Unit
+    private val onTranscript: (String) -> Unit,
+    private val onFinished: () -> Unit
 ) : RecognitionListener, TextToSpeech.OnInitListener {
     private var recognizer: SpeechRecognizer? = null
     private var tts: TextToSpeech? = TextToSpeech(activity, this)
@@ -77,9 +78,15 @@ class LocalVoiceController(
     override fun onReadyForSpeech(params: android.os.Bundle?) = onStatus("میکروفون فعال است؛ فرمان را بگو.")
     override fun onBeginningOfSpeech() = onStatus("در حال شنیدن فرمان…")
     override fun onEndOfSpeech() = onStatus("در حال پردازش محلی گفتار…")
-    override fun onError(error: Int) { if (!cancelled) onStatus("تشخیص گفتار محلی ناموفق بود (کد $error). دوباره تلاش کن.") }
+    override fun onError(error: Int) {
+        if (!cancelled) {
+            onFinished()
+            onStatus("تشخیص گفتار محلی ناموفق بود (کد $error). دوباره تلاش کن.")
+        }
+    }
     override fun onResults(results: android.os.Bundle?) {
         if (cancelled || closed) return
+        onFinished()
         val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.trim().orEmpty()
         if (text.isBlank()) onStatus("گفتاری تشخیص داده نشد؛ هیچ عملیاتی اجرا نشد.")
         else onTranscript(text)
