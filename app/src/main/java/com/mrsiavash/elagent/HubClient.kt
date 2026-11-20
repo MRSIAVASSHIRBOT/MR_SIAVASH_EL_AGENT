@@ -165,7 +165,7 @@ class HubClient(context: Context) {
         val trimmed = value.trim().trimEnd('/')
         val uri = java.net.URI(trimmed)
         require(uri.host != null && uri.userInfo == null && uri.query == null && uri.fragment == null &&
-            (uri.scheme == "https" || (uri.scheme == "http" && uri.host in setOf("10.0.2.2", "127.0.0.1", "localhost")))) {
+            uri.scheme == "https") {
             "آدرس Hub باید HTTPS باشد؛ HTTP فقط برای localhost توسعه مجاز است."
         }
         require(uri.path.isNullOrEmpty() || uri.path == "/") { "فقط آدرس اصلی Hub را وارد کنید، نه مسیر API." }
