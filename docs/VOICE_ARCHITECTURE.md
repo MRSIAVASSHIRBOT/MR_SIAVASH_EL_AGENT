@@ -100,7 +100,7 @@ Do not add message sending, purchases, account changes, file deletion, or remote
 
 ### V1 — Push-to-talk assistant
 - [x] Windows foreground push-to-talk with local Vosk STT, bounded capture, deterministic allowlist, and local system TTS (CI passed; physical acceptance pending).
-- [x] Android foreground push-to-talk prototype using Android's on-device recognizer only, runtime microphone permission, and ChatGPT/browser allowlist (Android 12+; physical acceptance pending).
+- [x] Android foreground push-to-talk prototype using Android's on-device recognizer only, runtime microphone permission, a 15-second capture cap, and an explicit ChatGPT/browser allowlist (Android 12+; physical acceptance pending).
 - [x] Android local Persian TTS only when an offline Persian system voice exists; otherwise text fallback.
 - [ ] Shared versioned typed action schema and common policy engine across platforms.
 - [ ] Expand the safe action catalog only after platform-specific tests and permission review.
