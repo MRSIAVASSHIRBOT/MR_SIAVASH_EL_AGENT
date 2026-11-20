@@ -42,8 +42,8 @@ class DesktopControlCenter:
     def __init__(self, root: tk.Tk):
         self.root = root
         root.title("MR_SIAVASH_EL_AGENT")
-        root.geometry("760x680")
-        root.minsize(640, 560)
+        root.geometry("760x820")
+        root.minsize(640, 680)
 
         outer = ttk.Frame(root, padding=16)
         outer.pack(fill="both", expand=True)
