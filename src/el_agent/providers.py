@@ -124,7 +124,7 @@ def cloud_key_configured() -> bool:
     try:
         keyring = _keyring_module()
         return bool(keyring.get_password(KEYRING_SERVICE, KEYRING_USERNAME))
-    except ProviderError:
+    except Exception:
         return False
 
 
@@ -172,7 +172,7 @@ class OpenAIChatProvider:
         data = _open_json(OPENAI_URL, {
             "model": self.model,
             "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 512,
+            "max_completion_tokens": 256,
         }, {"Authorization": f"Bearer {api_key}"}, self.timeout)
         choices = data.get("choices")
         message = choices[0].get("message") if isinstance(choices, list) and choices and isinstance(choices[0], dict) else None
