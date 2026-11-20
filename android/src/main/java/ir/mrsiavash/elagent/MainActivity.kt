@@ -9,7 +9,6 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.os.SystemClock
-import android.os.SystemClock
 import android.content.pm.PackageManager
 import android.os.Build
 import android.view.ViewGroup
@@ -24,7 +23,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
-import java.util.concurrent.CountDownLatch
+import java.time.Instant
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.time.Duration
@@ -113,13 +112,6 @@ class MainActivity : Activity() {
             }
         }, buttonParams())
 
-        root.addView(Button(this).apply {
-            text = "Check and run one approved Hub task"
-            backgroundTintList = ColorStateList.valueOf(Color.rgb(13, 33, 25))
-            setTextColor(Color.rgb(53, 214, 160))
-            setOnClickListener { runOneHubTask() }
-        }, buttonParams())
-
         taskButton = Button(this).apply {
             text = "Check Hub tasks"
             backgroundTintList = ColorStateList.valueOf(Color.rgb(13, 33, 25))
@@ -198,6 +190,10 @@ class MainActivity : Activity() {
                 "The task expires after ${claim.timeoutSeconds} seconds."
             )
             .setPositiveButton("Approve and continue") { _, _ ->
+                if (!Instant.now().isBefore(claim.leaseExpiresAt)) {
+                    setStatus("The Hub task lease expired before approval. No app was opened; Hub will reconcile the outcome as unknown.")
+                    return@setPositiveButton
+                }
                 val started = SystemClock.elapsedRealtime()
                 val launchResult = runCatching { launchAllowlisted(appName) }
                 val elapsed = SystemClock.elapsedRealtime() - started
@@ -226,6 +222,10 @@ class MainActivity : Activity() {
         errorCode: String?,
         durationMs: Long
     ) {
+        if (!Instant.now().isBefore(claim.leaseExpiresAt)) {
+            setStatus("The Hub task lease expired. No outcome was replayed; Hub will reconcile it as unknown.")
+            return
+        }
         executor.execute {
             runCatching { HubClient(store).completeTask(claim, succeeded, errorCode, durationMs) }
                 .onSuccess {
@@ -246,88 +246,6 @@ class MainActivity : Activity() {
      * silently in the background; the owner taps this button while the companion
      * is foregrounded. Unsupported Windows-only aliases are reported as failures.
      */
-    private fun runOneHubTask() {
-        setBusy("Checking for one approved Hub task…")
-        executor.execute {
-            try {
-                val hub = HubClient(store)
-                val claim = hub.claimTask()
-                if (claim == null) {
-                    runOnUiThread { setStatus("No eligible app-launch task is queued for this Android device.") }
-                    return@execute
-                }
-
-                val startedAt = SystemClock.elapsedRealtime()
-                val alias = claim.app
-                if (alias !in setOf("chatgpt", "browser")) {
-                    hub.completeTask(claim, false, "app_not_available", 0L)
-                    runOnUiThread {
-                        setStatus("Hub task ${claim.taskId} was reported as unavailable on Android; no app was opened.")
-                    }
-                    return@execute
-                }
-
-                val leaseRemainingMs = Duration.between(Instant.now(), claim.leaseExpiresAt).toMillis()
-                val executionBudgetMs = minOf(claim.timeoutSeconds * 1000L, leaseRemainingMs)
-                if (executionBudgetMs <= 0L) {
-                    runOnUiThread {
-                        setStatus("Hub task lease expired before Android execution; no app was opened.")
-                    }
-                    return@execute
-                }
-
-                val completed = CountDownLatch(1)
-                var launchError: Throwable? = null
-                runOnUiThread {
-                    try {
-                        if (
-                            SystemClock.elapsedRealtime() - startedAt >= executionBudgetMs ||
-                            !Instant.now().isBefore(claim.leaseExpiresAt)
-                        ) {
-                            throw java.util.concurrent.TimeoutException("Android UI was not ready before the task lease deadline.")
-                        }
-                        if (isFinishing || isDestroyed) {
-                            throw IllegalStateException("Android companion is no longer foregrounded.")
-                        }
-                        launchAllowlisted(alias!!)
-                    } catch (error: Throwable) {
-                        launchError = error
-                    } finally {
-                        completed.countDown()
-                    }
-                }
-
-                val finishedInTime = completed.await(executionBudgetMs, TimeUnit.MILLISECONDS)
-                val durationMs = (SystemClock.elapsedRealtime() - startedAt).coerceAtLeast(0L)
-                if (!finishedInTime) {
-                    // Do not report a false failure or retry an ambiguous launch.
-                    // The Hub lease expiry reconciler will mark the task unknown_outcome.
-                    runOnUiThread {
-                        setStatus("Hub task timed out. Its result is ambiguous; it will not be replayed automatically.")
-                    }
-                    return@execute
-                }
-
-                val succeeded = launchError == null
-                val errorCode = when (launchError) {
-                    null -> null
-                    is java.util.concurrent.TimeoutException -> "timeout"
-                    is IllegalArgumentException -> "app_not_available"
-                    else -> "execution_failed"
-                }
-                hub.completeTask(claim, succeeded, errorCode, durationMs)
-                runOnUiThread {
-                    setStatus(
-                        if (succeeded) "Hub task ${claim.taskId} was reported to Hub as successful (not independently verified)."
-                        else "Hub task ${claim.taskId} failed: ${launchError?.message ?: "execution error"}."
-                    )
-                }
-            } catch (error: Exception) {
-                runOnUiThread { setStatus(error.message ?: "Hub task execution failed.") }
-            }
-        }
-    }
-
     private fun toggleVoice() {
         if (voiceActive) {
             voiceController.stop()
