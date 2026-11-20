@@ -188,6 +188,30 @@ If essential information is missing or the request requires an unsupported opera
 }
 
 object AgentPlanPolicy {
+    /** Defense in depth for callers that construct typed steps without using AgentPlanParser. */
+    fun isSafeForExecution(step: AgentPlanStep): Boolean = when (step.operation) {
+        AgentOperation.OPEN_APP ->
+            step.target in setOf("chatgpt", "browser") && step.text == null
+        AgentOperation.OPEN_URL -> {
+            val target = step.target
+            if (target.isNullOrBlank() || target.length > AgentPlanParser.MAX_URL_CHARS || step.text != null) {
+                false
+            } else {
+                val uri = runCatching { URI(target) }.getOrNull()
+                uri != null &&
+                    uri.scheme.equals("https", ignoreCase = true) &&
+                    !uri.host.isNullOrBlank() &&
+                    uri.userInfo == null &&
+                    (uri.port == -1 || uri.port in 1..65535)
+            }
+        }
+        AgentOperation.READ_SELECTED_DOCUMENT -> step.target == null && step.text == null
+        AgentOperation.SHOW_TEXT ->
+            step.target == null &&
+                !step.text.isNullOrBlank() &&
+                step.text.length <= AgentPlanParser.MAX_TEXT_CHARS
+    }
+
     fun requirement(step: AgentPlanStep): PlanStepRequirement = when (step.operation) {
         AgentOperation.OPEN_APP -> PlanStepRequirement(
             CapabilityId.APP_LAUNCH, ActionEffect.LOCAL_CHANGE,
