@@ -170,8 +170,8 @@ class OpenAiChatProvider(
                         .put("depends_on", JSONObject().put(
                             "type", "array"
                         ).put("items", idSchema).put("maxItems", 8))
-                        .put("target", JSONObject().put("type", JSONArray().put("string").put("null")).put("maxLength", 512))
-                        .put("text", JSONObject().put("type", JSONArray().put("string").put("null")).put("maxLength", 1200))
+                        .put("target", JSONObject().put("type", JSONArray().put("string").put("null")))
+                        .put("text", JSONObject().put("type", JSONArray().put("string").put("null")))
                 )
                 .put("required", JSONArray().put("id").put("operation").put("depends_on").put("target").put("text"))
             return JSONObject()
@@ -181,9 +181,9 @@ class OpenAiChatProvider(
                     "properties",
                     JSONObject()
                         .put("schema_version", JSONObject().put("type", "integer").put("enum", JSONArray().put(1)))
-                        .put("summary", JSONObject().put("type", "string").put("minLength", 1).put("maxLength", 300))
+                        .put("summary", JSONObject().put("type", "string"))
                         .put("steps", JSONObject().put("type", "array").put("items", stepSchema).put("maxItems", 8))
-                        .put("clarification", JSONObject().put("type", JSONArray().put("string").put("null")).put("maxLength", 400))
+                        .put("clarification", JSONObject().put("type", JSONArray().put("string").put("null")))
                 )
                 .put("required", JSONArray().put("schema_version").put("summary").put("steps").put("clarification"))
         }
