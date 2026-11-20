@@ -27,7 +27,7 @@
 ## Voice intelligence
 - [x] Windows push-to-talk: local Vosk speech-to-text, allowlisted intent routing, and local TTS (4/4 CI matrix jobs pass; physical microphone acceptance pending)
 - [ ] Persian Windows speech voice quality and microphone device acceptance
-- [ ] Android push-to-talk with runtime microphone permission and foreground UX
+- [x] Android push-to-talk prototype: runtime microphone permission, on-device recognizer only, foreground stop behavior, local TTS, and allowlisted ChatGPT/browser intents (Android 12+; Persian recognizer support is device-dependent)
 - [ ] Local Persian wake-word detection for «سیا» (explicit opt-in; no cloud ambient audio)
 - [ ] Hybrid cloud STT/LLM provider with explicit consent, quotas, and offline fallback
 - [ ] Shared Android/Windows voice action contract and policy engine
