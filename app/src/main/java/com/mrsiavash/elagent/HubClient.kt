@@ -52,7 +52,7 @@ class HubClient(context: Context) {
             JSONObject()
                 .put("agent_version", VERSION)
                 .put("runtime_state", "ready")
-                .put("app_uptime_seconds", (SystemClock.elapsedRealtime() / 1000L).coerceAtMost(31_536_000L)),
+                .put("app_uptime_seconds", ((SystemClock.elapsedRealtime() - PROCESS_STARTED_AT) / 1000L).coerceAtMost(31_536_000L)),
             credentials.getString("access_token")
         )
     }
@@ -115,16 +115,24 @@ class HubClient(context: Context) {
         require(result.getString("device_id") == store.deviceId()) { "Hub device identity mismatch." }
         val scopes = result.optJSONArray("scopes") ?: error("Hub did not return granted scopes.")
         val granted = (0 until scopes.length()).map { scopes.getString(it) }.toSet()
+        val accessToken = result.optString("access_token")
+        val refreshToken = result.optString("refresh_token")
+        val accessTtl = result.optLong("expires_in", -1)
+        val refreshTtl = result.optLong("refresh_expires_in", -1)
         require("device.heartbeat" in granted && granted.all { it in setOf("device.heartbeat", "app.launch") }) {
             "Hub granted an unsupported scope set."
+        }
+        require(accessToken.length >= 40 && refreshToken.length >= 40 &&
+            accessTtl in 30..3600 && refreshTtl in 3600..7_776_000) {
+            "Hub returned malformed or out-of-policy device credentials."
         }
         val credentials = JSONObject()
             .put("hub_url", origin)
             .put("device_id", store.deviceId())
-            .put("access_token", result.getString("access_token"))
-            .put("refresh_token", result.getString("refresh_token"))
-            .put("access_expires_at", Instant.now().plusSeconds(result.getLong("expires_in")).toString())
-            .put("refresh_expires_at", Instant.now().plusSeconds(result.getLong("refresh_expires_in")).toString())
+            .put("access_token", accessToken)
+            .put("refresh_token", refreshToken)
+            .put("access_expires_at", Instant.now().plusSeconds(accessTtl).toString())
+            .put("refresh_expires_at", Instant.now().plusSeconds(refreshTtl).toString())
             .put("scopes", scopes)
         store.saveCredentials(credentials)
     }
@@ -172,5 +180,8 @@ class HubClient(context: Context) {
         return trimmed
     }
 
-    companion object { const val VERSION = "0.3.0" }
+    companion object {
+        const val VERSION = "0.3.0"
+        private val PROCESS_STARTED_AT = SystemClock.elapsedRealtime()
+    }
 }
