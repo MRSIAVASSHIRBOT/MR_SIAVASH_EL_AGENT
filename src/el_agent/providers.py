@@ -157,7 +157,7 @@ class OpenAIChatProvider:
     """Official OpenAI API adapter; credentials are read only from the OS keyring."""
 
     def __init__(self, model: str | None = None, timeout: int = 45):
-        self.model = model or os.environ.get("EL_AGENT_CLOUD_MODEL", "gpt-4o-mini")
+        self.model = model or os.environ.get("EL_AGENT_CLOUD_MODEL", "gpt-6-luna")
         self.timeout = timeout
 
     def chat(self, prompt: str) -> ChatResult:
