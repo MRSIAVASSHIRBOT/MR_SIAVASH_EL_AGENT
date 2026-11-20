@@ -51,6 +51,10 @@ The owner chooses the scopes in the pairing challenge. Device-advertised capabil
 
 These are foreground, user-tapped actions. Android background activity-launch restrictions are respected.
 
+## User-selected local text files
+
+Tap **انتخاب و پیش‌نمایش فایل متنی** and choose a document in Android's system picker. The app uses the Storage Access Framework; it does not request broad storage access. Only text and the supported structured-text MIME types are previewed. Reads are limited to 64 KiB and displayed output to 12,000 characters. Invalid UTF-8, binary content, PDF, and unsupported file types are rejected. Read access is persisted only when the document provider explicitly returns both read and persistable grants; otherwise the temporary picker grant is used for the current session. The contents remain on-device and are not included in cloud chat or Hub requests.
+
 ## Disconnect
 Tap **Unpair locally** to erase the stored Hub credentials while preserving the installation's Device ID. Then revoke the device from the Hub owner device registry. Local unpairing alone does not revoke the server-side device record.
 
