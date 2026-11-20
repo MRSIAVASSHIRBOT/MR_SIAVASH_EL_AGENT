@@ -123,54 +123,66 @@ def execute_claimed(claimed: dict[str, Any]) -> dict[str, Any]:
     scopes = credentials.get("scopes", [])
     action = task.get("action")
 
+    if not isinstance(task_id, str):
+        raise HubClientError("Hub task identity is invalid.")
     try:
-        if not isinstance(task_id, str) or str(UUID(task_id)) != task_id:
-            raise ValueError("Task identity is invalid.")
+        if str(UUID(task_id)) != task_id:
+            raise ValueError("Task identity is not canonical.")
         lease_value = claimed.get("lease_expires_at")
         if not isinstance(lease_value, str):
             raise ValueError("Task lease expiry is missing.")
         lease_expires_at = datetime.fromisoformat(lease_value.replace("Z", "+00:00"))
         if lease_expires_at.tzinfo is None or lease_expires_at.utcoffset() is None:
             raise ValueError("Task lease expiry must include a timezone.")
-        if not _utc_now() < lease_expires_at:
-            return {
-                "task_id": task_id,
-                "reported_status": "not_reported_lease_expired",
-                "outcome_verified": None,
-                "action_attempted": False,
-            }
-
-        if not isinstance(required_scope, str):
-            raise ValueError("Task scope is missing.")
-        expected_scope = (
-            "app.launch" if action == "app.launch"
-            else "screen.capture" if action == "screen.capture"
-            else None
-        )
-        if expected_scope is None or required_scope != expected_scope or required_scope not in scopes:
-            raise PermissionError("Task action is outside the exact granted scope.")
-        timeout = task.get("timeout_seconds")
-        if (
-            isinstance(timeout, bool)
-            or not isinstance(timeout, int)
-            or not 5 <= timeout <= MAX_TASK_TIMEOUT_SECONDS
-        ):
-            raise ValueError("Task timeout is outside the supported bound.")
     except (ValueError, TypeError) as exc:
-        raise HubClientError("Hub task identity, scope, or lease contract is invalid.") from exc
+        raise HubClientError("Hub task identity or lease contract is invalid.") from exc
 
-    started = time.monotonic()
+    if not _utc_now() < lease_expires_at:
+        return {
+            "task_id": task_id,
+            "reported_status": "not_reported_lease_expired",
+            "outcome_verified": None,
+            "action_attempted": False,
+        }
+
+    expected_scope = (
+        "app.launch" if action == "app.launch"
+        else "screen.capture" if action == "screen.capture"
+        else None
+    )
+    timeout = task.get("timeout_seconds")
+    scope_allowed = (
+        expected_scope is not None
+        and required_scope == expected_scope
+        and isinstance(scopes, list)
+        and required_scope in scopes
+    )
+    timeout_valid = (
+        not isinstance(timeout, bool)
+        and isinstance(timeout, int)
+        and 5 <= timeout <= MAX_TASK_TIMEOUT_SECONDS
+    )
+
     outcome = "succeeded"
     error_code = None
-    try:
-        _execute(task)
-    except PermissionError:
+    started = time.monotonic()
+    if not scope_allowed:
+        # Deny locally even if an upstream contract unexpectedly returns a
+        # task without the exact capability. Report the denial over the
+        # mandatory heartbeat scope so Hub audit can record the decision.
         outcome, error_code = "failed", "permission_denied"
-    except TimeoutError:
-        outcome, error_code = "failed", "timeout"
-    except Exception:
-        logger.exception("Hub device task failed")
+    elif not timeout_valid:
         outcome, error_code = "failed", "execution_failed"
+    else:
+        try:
+            _execute(task)
+        except PermissionError:
+            outcome, error_code = "failed", "permission_denied"
+        except TimeoutError:
+            outcome, error_code = "failed", "timeout"
+        except Exception:
+            logger.exception("Hub device task failed")
+            outcome, error_code = "failed", "execution_failed"
 
     duration_ms = min(60_000, max(0, int((time.monotonic() - started) * 1000)))
 
@@ -182,7 +194,7 @@ def execute_claimed(claimed: dict[str, Any]) -> dict[str, Any]:
             "task_id": task_id,
             "reported_status": "not_reported_lease_expired",
             "outcome_verified": None,
-            "action_attempted": True,
+            "action_attempted": scope_allowed and timeout_valid,
         }
 
     payload: dict[str, Any] = {
@@ -200,7 +212,7 @@ def execute_claimed(claimed: dict[str, Any]) -> dict[str, Any]:
         "task_id": task_id,
         "reported_status": reported_task.get("status"),
         "outcome_verified": reported_task.get("outcome_verified"),
-        "action_attempted": True,
+        "action_attempted": scope_allowed and timeout_valid,
     }
 
 
