@@ -90,14 +90,23 @@ class AgentPlanExecutionSession(
             ?: throw IllegalArgumentException("Unknown plan step.")
         val current = record(stepId).state
         when (current) {
-            PlanStepState.PENDING -> require(step.operation == AgentOperation.SHOW_TEXT) {
-                "Only local text display can complete directly from pending state."
+            PlanStepState.PENDING -> {
+                requireNextRunnable(stepId)
+                require(step.operation == AgentOperation.SHOW_TEXT) {
+                    "Only local text display can complete directly from pending state."
+                }
             }
-            PlanStepState.WAITING_FOR_RESOURCE -> require(step.operation == AgentOperation.READ_SELECTED_DOCUMENT) {
-                "Only selected-document work can complete after resource selection."
+            PlanStepState.WAITING_FOR_RESOURCE -> {
+                requireEarlierStepsCompleted(stepId)
+                require(step.operation == AgentOperation.READ_SELECTED_DOCUMENT) {
+                    "Only selected-document work can complete after resource selection."
+                }
             }
-            PlanStepState.DISPATCHED -> require(ownerVerified) {
-                "An external action requires explicit owner verification before completion."
+            PlanStepState.DISPATCHED -> {
+                requireEarlierStepsCompleted(stepId)
+                require(ownerVerified) {
+                    "An external action requires explicit owner verification before completion."
+                }
             }
             PlanStepState.COMPLETED, PlanStepState.FAILED ->
                 throw IllegalStateException("This step is already in a terminal state.")
@@ -107,6 +116,8 @@ class AgentPlanExecutionSession(
 
     fun markFailed(stepId: String, detail: String) {
         val state = record(stepId).state
+        if (state == PlanStepState.PENDING) requireNextRunnable(stepId)
+        else requireEarlierStepsCompleted(stepId)
         require(state == PlanStepState.PENDING ||
             state == PlanStepState.WAITING_FOR_RESOURCE ||
             state == PlanStepState.DISPATCHED) {
@@ -122,6 +133,14 @@ class AgentPlanExecutionSession(
             ?: throw IllegalStateException("The plan is blocked until the previous step is verified.")
         require(next.id == stepId) { "Only the next ordered plan step can be executed." }
         return next
+    }
+
+    private fun requireEarlierStepsCompleted(stepId: String) {
+        val index = plan.steps.indexOfFirst { it.id == stepId }
+        require(index >= 0) { "Unknown plan step." }
+        require(plan.steps.take(index).all { records.getValue(it.id).state == PlanStepState.COMPLETED }) {
+            "Previous plan steps must be completed first."
+        }
     }
 
     private fun update(stepId: String, state: PlanStepState, detail: String) {
