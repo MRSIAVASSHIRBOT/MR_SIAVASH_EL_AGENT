@@ -1,7 +1,6 @@
 package ir.mrsiavash.elagent
 
-/** Metadata for user-selected, on-device model files. Importing a model does not
- * mean its native inference runtime is available; JNI integration is a later increment. */
+/** Metadata for user-selected on-device model files. */
 enum class OfflineModelEngine { WHISPER_CPP, LLAMA_CPP }
 
 data class OfflineModelSpec(
