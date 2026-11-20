@@ -166,6 +166,11 @@ class MainActivity : Activity() {
             )
         }
         root.addView(chatMode, fieldParams())
+        root.addView(TextView(this).apply {
+            text = "Online/Hybrid فقط متن واردشده را ارسال می‌کند؛ هزینه API ممکن است جداگانه محاسبه شود."
+            textSize = 12f
+            setTextColor(Color.rgb(190, 205, 196))
+        }, fieldParams())
         chatPrompt = EditText(this).apply {
             hint = "پیام یا فرمانت را بنویس…"
             setTextColor(Color.WHITE)
