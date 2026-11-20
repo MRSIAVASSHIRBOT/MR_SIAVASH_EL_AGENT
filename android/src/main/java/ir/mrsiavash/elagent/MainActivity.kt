@@ -1,11 +1,14 @@
 package ir.mrsiavash.elagent
 
+import android.Manifest
 import android.app.Activity
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.content.pm.PackageManager
+import android.os.Build
 import android.view.ViewGroup
 import android.widget.Button
 import android.text.InputType
@@ -27,10 +30,15 @@ class MainActivity : Activity() {
     private lateinit var status: TextView
     private lateinit var hubUrl: EditText
     private lateinit var pairingCode: EditText
+    private lateinit var voiceController: LocalVoiceController
+    private lateinit var voiceButton: Button
+    private var voiceActive = false
+    private val recordAudioRequest = 4102
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         store = SecureStore(this)
+        voiceController = LocalVoiceController(this, ::setStatus, ::handleVoiceTranscript)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.rgb(7, 19, 15))
@@ -98,6 +106,13 @@ class MainActivity : Activity() {
                 }
             }
         }, buttonParams())
+        voiceButton = Button(this).apply {
+            text = "شروع فرمان صوتی (محلی)"
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(19, 185, 129))
+            setTextColor(Color.BLACK)
+            setOnClickListener { toggleVoice() }
+        }
+        root.addView(voiceButton, buttonParams())
         root.addView(Button(this).apply {
             text = "Open ChatGPT"
             backgroundTintList = ColorStateList.valueOf(Color.rgb(13, 33, 25))
@@ -134,6 +149,70 @@ class MainActivity : Activity() {
         }
     }
 
+
+    private fun toggleVoice() {
+        if (voiceActive) {
+            voiceController.stop()
+            voiceActive = false
+            voiceButton.text = "شروع فرمان صوتی (محلی)"
+            setStatus("فرمان صوتی متوقف شد.")
+            return
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            setStatus("فرمان صوتی کاملاً محلی به Android 12 یا جدیدتر نیاز دارد.")
+            return
+        }
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), recordAudioRequest)
+            return
+        }
+        beginVoice()
+    }
+
+    private fun beginVoice() {
+        voiceActive = voiceController.start()
+        voiceButton.text = if (voiceActive) "توقف فرمان صوتی" else "شروع فرمان صوتی (محلی)"
+        if (!voiceActive) setStatus("تشخیص گفتار محلی در دسترس نیست؛ هیچ صدایی به Cloud ارسال نشد.")
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == recordAudioRequest) {
+            if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) beginVoice()
+            else setStatus("مجوز میکروفون داده نشد؛ قابلیت صوتی غیرفعال ماند.")
+        }
+    }
+
+    private fun handleVoiceTranscript(transcript: String) {
+        voiceActive = false
+        voiceButton.text = "شروع فرمان صوتی (محلی)"
+        setStatus("متن تشخیص‌داده‌شده: " + transcript)
+        val normalized = transcript.lowercase(java.util.Locale.ROOT)
+            .replace("ي", "ی").replace("ك", "ک").replace("‌", " ")
+        val alias = when {
+            normalized.contains("چت جی پی تی") || normalized.contains("chatgpt") || normalized.contains("chat gpt") -> "chatgpt"
+            normalized.contains("مرورگر") || normalized.contains("browser") -> "browser"
+            else -> null
+        }
+        if (alias == null) {
+            val message = "این فرمان در فهرست مجاز نیست؛ هیچ عملیاتی اجرا نشد."
+            setStatus(message)
+            voiceController.speak(message)
+            return
+        }
+        runCatching { launchAllowlisted(alias) }
+            .onSuccess {
+                val message = if (alias == "chatgpt") "ChatGPT باز شد." else "مرورگر باز شد."
+                setStatus(message)
+                voiceController.speak(message)
+            }
+            .onFailure {
+                val message = "اجرای فرمان ناموفق بود: " + (it.message ?: "خطای نامشخص")
+                setStatus(message)
+                voiceController.speak(message)
+            }
+    }
+
     private fun launchAllowlisted(alias: String) {
         when (alias) {
             "chatgpt" -> {
@@ -162,7 +241,17 @@ class MainActivity : Activity() {
         )
     }
 
+    override fun onPause() {
+        if (voiceActive) {
+            voiceController.stop()
+            voiceActive = false
+            if (::voiceButton.isInitialized) voiceButton.text = "شروع فرمان صوتی (محلی)"
+        }
+        super.onPause()
+    }
+
     override fun onDestroy() {
+        voiceController.close()
         executor.shutdown()
         super.onDestroy()
     }
