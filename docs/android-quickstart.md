@@ -54,5 +54,9 @@ These are foreground, user-tapped actions. Android background activity-launch re
 ## Disconnect
 Tap **Unpair locally** to erase the stored Hub credentials while preserving the installation's Device ID. Then revoke the device from the Hub owner device registry. Local unpairing alone does not revoke the server-side device record.
 
+## Android local push-to-talk
+
+On Android 12 (API 31) or newer, tap **شروع فرمان صوتی (محلی)** and grant microphone permission when prompted. The app uses Android's on-device speech recognizer only (`createOnDeviceSpeechRecognizer`) with `fa-IR`; it does not fall back to a network recognizer. Availability and Persian language support depend on the device's installed offline recognition service. The only voice actions are opening ChatGPT or the browser. Unsupported speech is rejected. Listening is stopped when the activity leaves the foreground. Local Persian text-to-speech is used when the installed system voice supports it; otherwise the text response remains visible.
+
 ## Current limitations
 This is an Android companion preview, not full Android remote-control. Screenshot capture requires a separate Android MediaProjection consent flow and foreground service, so it is not enabled. Remote task dispatch awaits the Hub task-dispatch API release. The app does not perform arbitrary shell commands, hidden monitoring, unrestricted file access, or background UI interaction.
