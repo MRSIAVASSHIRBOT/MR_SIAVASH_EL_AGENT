@@ -25,7 +25,7 @@
 - [ ] Browser extension with explicit host permissions
 - [ ] Cloud scheduling and online-device coordination
 ## Voice intelligence
-- [ ] Windows push-to-talk: local Vosk speech-to-text, allowlisted intent routing, and local TTS (code added; CI and physical microphone acceptance pending)
+- [x] Windows push-to-talk: local Vosk speech-to-text, allowlisted intent routing, and local TTS (4/4 CI matrix jobs pass; physical microphone acceptance pending)
 - [ ] Persian Windows speech voice quality and microphone device acceptance
 - [ ] Android push-to-talk with runtime microphone permission and foreground UX
 - [ ] Local Persian wake-word detection for «سیا» (explicit opt-in; no cloud ambient audio)
