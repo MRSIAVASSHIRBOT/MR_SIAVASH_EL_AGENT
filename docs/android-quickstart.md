@@ -34,8 +34,8 @@ curl --request POST "https://YOUR-HUB-ORIGIN/devices/pairing-challenges" \
     "device_id": "ANDROID_DEVICE_UUID",
     "platform": "android",
     "label": "My Android phone",
-    "advertised_capabilities": ["device.heartbeat"],
-    "scopes": ["device.heartbeat"]
+    "advertised_capabilities": ["device.heartbeat", "app.launch"],
+    "scopes": ["device.heartbeat", "app.launch"]
   }'
 ```
 
@@ -43,7 +43,7 @@ curl --request POST "https://YOUR-HUB-ORIGIN/devices/pairing-challenges" \
 5. The app exchanges the code directly with Hub. The code is not stored. Device credentials are encrypted using an AES-GCM key held by Android Keystore.
 6. Tap **Send heartbeat now** to verify connectivity. WorkManager schedules a network-constrained periodic heartbeat; Android controls the exact execution time to preserve battery.
 
-The owner chooses the scopes in the pairing challenge. Device-advertised capabilities do not grant permissions. For this preview, request only `device.heartbeat`; do not grant future scopes before the corresponding Hub endpoint and Android behavior are released and reviewed.
+The owner chooses the scopes in the pairing challenge. Device-advertised capabilities do not grant permissions. For this preview, request only `device.heartbeat` and `app.launch`. Do not grant `screen.capture`: Android does not implement remote screenshot capture. The app rejects any scope outside this exact set.
 
 ## Local actions
 - **Open ChatGPT** opens the installed ChatGPT Android app when available; otherwise it opens the official `https://chatgpt.com/` website.
