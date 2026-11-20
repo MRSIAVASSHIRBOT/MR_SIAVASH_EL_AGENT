@@ -6,6 +6,8 @@
 - [x] Explicit screenshot endpoint
 - [x] Allowlisted application launch, including fixed ChatGPT URL shortcut
 - [x] SQLite-backed scheduled app launch, task listing, and cancellation
+- [x] Restart recovery fences interrupted launches as unknown_outcome without replay
+- [x] Pending tasks more than 24 hours overdue are marked missed; recent due tasks remain eligible
 - [x] Windows and Linux CI pass on Python 3.11 and 3.12
 - [ ] Clean Windows 11 installation and live acceptance test
 - [x] Friendly desktop control center with task management and ISO-8601 scheduling
@@ -39,3 +41,11 @@
 - [ ] Cross-device orchestration
 
 No item is complete until code, tests, privacy review, and platform acceptance evidence exist.
+
+
+## Scheduler recovery acceptance
+
+- [x] Unit tests cover interrupted-running reconciliation, overdue-task expiry, one-time claiming, and normal finish states.
+- [x] Scheduler startup reconciles interrupted rows before claiming new work.
+- [x] The local scheduler runs app-launch work off the event loop and leaves interrupted executions unreplayed.
+- [ ] Physical Windows 11 restart/offline acceptance remains pending.
