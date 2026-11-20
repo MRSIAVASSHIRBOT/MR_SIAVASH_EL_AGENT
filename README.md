@@ -31,7 +31,7 @@ Open PowerShell in the downloaded/cloned repository directory:
     Set-ExecutionPolicy -Scope Process Bypass
     .\install.ps1
 
-The installer creates a virtual environment, installs the app, and creates a local API token. The token is printed once; keep it private.
+The installer creates a virtual environment, installs the app, creates a local API token, and places a desktop shortcut that opens the control center. The token is printed once; keep it private.
 
 If you prefer manual installation:
 
