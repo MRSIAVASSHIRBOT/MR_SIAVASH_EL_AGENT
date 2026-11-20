@@ -24,9 +24,10 @@ class FreeProviderRouterTest {
             failure = ProviderRequestException(FreeProviderId.GEMINI, ProviderFailureKind.RATE_LIMIT, "limited", 12)
         )
         val next = FakeProvider(FreeProviderId.GROQ, result = """{"steps":[]}""")
-        val router = FreeProviderPlanRouterForTest(listOf(limited, next))
-        val result = router.generate()
+        val result = FreeProviderPlanRouter(providersOverride = listOf(limited, next))
+            .generate("system", "user")
         assertEquals(FreeProviderId.GROQ, result.provider)
+        assertEquals("""{"steps":[]}""", result.json)
         assertEquals(1, limited.calls)
         assertEquals(1, next.calls)
     }
@@ -37,7 +38,7 @@ class FreeProviderRouterTest {
             failure = ProviderRequestException(FreeProviderId.GEMINI, ProviderFailureKind.RATE_LIMIT, "limited")
         )
         val fallback = FakeProvider(FreeProviderId.OPENROUTER, result = "{}")
-        FreeProviderPlanRouterForTest(listOf(failed, fallback)).generate()
+        FreeProviderPlanRouter(providersOverride = listOf(failed, fallback)).generate("system", "user")
         assertEquals(1, failed.calls)
     }
 
@@ -51,7 +52,7 @@ class FreeProviderRouterTest {
             failure = ProviderRequestException(FreeProviderId.GROQ, ProviderFailureKind.RATE_LIMIT, "limited", 25)
         )
         val error = org.junit.Assert.assertThrows(NoFreeProviderAvailableException::class.java) {
-            FreeProviderPlanRouterForTest(listOf(first, second)).generate()
+            FreeProviderPlanRouter(providersOverride = listOf(first, second)).generate("system", "user")
         }
         assertEquals(25L, error.retryAfterSeconds)
         assertEquals(2, error.providerErrors.size)
@@ -90,17 +91,3 @@ class FreeProviderRouterTest {
     }
 }
 
-private class FreeProviderPlanRouterForTest(private val providers: List<StructuredPlanProvider>) {
-    data class Result(val provider: FreeProviderId, val json: String)
-    fun generate(): Result {
-        val errors = mutableListOf<ProviderRequestException>()
-        for (provider in providers) {
-            try {
-                return Result(provider.id, provider.generate("system", "user"))
-            } catch (error: ProviderRequestException) {
-                errors += error
-            }
-        }
-        throw NoFreeProviderAvailableException(errors, errors.mapNotNull { it.retryAfterSeconds }.minOrNull())
-    }
-}
