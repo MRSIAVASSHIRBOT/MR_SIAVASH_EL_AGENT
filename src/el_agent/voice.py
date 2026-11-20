@@ -71,7 +71,9 @@ def listen_once(
     except Exception as exc:
         raise VoiceUnavailable("Could not load the local Vosk speech model.") from exc
 
-    audio_queue: queue.Queue[bytes] = queue.Queue()
+    # Each block is 0.5 s at 16 kHz mono int16. Bound queued audio to 8 s.
+    audio_queue: queue.Queue[bytes] = queue.Queue(maxsize=16)
+    overflow_event = threading.Event()
     segments: list[str] = []
 
     def audio_callback(indata, _frames, _time_info, status):
@@ -79,7 +81,11 @@ def listen_once(
             # Device status is surfaced by sounddevice exceptions where possible;
             # do not log or persist microphone buffers.
             pass
-        audio_queue.put(bytes(indata))
+        try:
+            audio_queue.put_nowait(bytes(indata))
+        except queue.Full:
+            # Never let a slow recognizer grow an unbounded in-memory audio backlog.
+            overflow_event.set()
 
     deadline = time.monotonic() + max_seconds
     try:
@@ -91,6 +97,10 @@ def listen_once(
             callback=audio_callback,
         ):
             while not stop_event.is_set() and time.monotonic() < deadline:
+                if overflow_event.is_set():
+                    raise VoiceUnavailable(
+                        "Audio processing fell behind; recording stopped safely. Try again with fewer background tasks."
+                    )
                 try:
                     chunk = audio_queue.get(timeout=0.25)
                 except queue.Empty:
@@ -99,6 +109,10 @@ def listen_once(
                     text = json.loads(recognizer.Result()).get("text", "").strip()
                     if text:
                         segments.append(text)
+            if overflow_event.is_set():
+                raise VoiceUnavailable(
+                    "Audio processing fell behind; recording stopped safely. Try again with fewer background tasks."
+                )
             final_text = json.loads(recognizer.FinalResult()).get("text", "").strip()
             if final_text:
                 segments.append(final_text)
