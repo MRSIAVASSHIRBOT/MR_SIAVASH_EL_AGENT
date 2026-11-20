@@ -3,6 +3,8 @@ package ir.mrsiavash.elagent
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.tls.HandshakeCertificates
+import okhttp3.tls.HeldCertificate
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
@@ -11,11 +13,29 @@ import org.junit.Test
 
 class OpenAiChatProviderTest {
     private lateinit var server: MockWebServer
+    private lateinit var client: OkHttpClient
 
     @Before
     fun setUp() {
+        val certificate = HeldCertificate.Builder()
+            .addSubjectAlternativeName("localhost")
+            .addSubjectAlternativeName("127.0.0.1")
+            .build()
+        val serverCertificates = HandshakeCertificates.Builder()
+            .heldCertificate(certificate)
+            .build()
+        val clientCertificates = HandshakeCertificates.Builder()
+            .addTrustedCertificate(certificate.certificate)
+            .build()
+
         server = MockWebServer()
+        server.useHttps(serverCertificates.sslSocketFactory(), false)
         server.start()
+        client = OkHttpClient.Builder()
+            .sslSocketFactory(clientCertificates.sslSocketFactory(), clientCertificates.trustManager)
+            .followRedirects(false)
+            .followSslRedirects(false)
+            .build()
     }
 
     @After
@@ -32,7 +52,7 @@ class OpenAiChatProviderTest {
             "test-api-key-that-is-long-enough",
             "test-model",
             server.url("/v1/chat/completions").toString(),
-            OkHttpClient.Builder().followRedirects(false).followSslRedirects(false).build()
+            client
         )
         assertEquals("Hello from cloud", provider.chat("hello"))
         val request = server.takeRequest()
@@ -48,7 +68,7 @@ class OpenAiChatProviderTest {
             "test-api-key-that-is-long-enough",
             "test-model",
             server.url("/chat").toString(),
-            OkHttpClient.Builder().followRedirects(false).followSslRedirects(false).build()
+            client
         )
         assertThrows(IllegalStateException::class.java) { provider.chat("hello") }
         assertEquals(1, server.requestCount)
@@ -59,7 +79,8 @@ class OpenAiChatProviderTest {
         val provider = OpenAiChatProvider(
             "test-api-key-that-is-long-enough",
             "test-model",
-            server.url("/chat").toString()
+            server.url("/chat").toString(),
+            client
         )
         assertThrows(IllegalArgumentException::class.java) {
             provider.chat("x".repeat(OpenAiChatProvider.MAX_PROMPT_CHARS + 1))
