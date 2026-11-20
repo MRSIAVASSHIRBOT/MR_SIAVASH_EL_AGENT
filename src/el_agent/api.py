@@ -75,7 +75,7 @@ def create_app(*, token: str | None = None, store: TaskStore | None = None, scre
     async def device(_: None = Depends(auth)):
         return {"platform":"windows","mode":"local","remote_access":False,
                 "supported_apps":sorted([*APP_ALLOWLIST,"browser","chatgpt"]),
-                "capabilities":["device.heartbeat","screen.capture.explicit","app.launch.allowlisted","task.schedule.launch"]}
+                "capabilities":["device.heartbeat","screen.capture.explicit","app.launch.allowlisted","task.schedule.launch","assistant.chat.local","assistant.chat.online.opt_in","assistant.chat.hybrid.opt_in"]}
     @app.post("/v1/assistant/chat")
     async def assistant_chat(payload: ChatRequest, _: None = Depends(auth)):
         try:
