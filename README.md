@@ -68,7 +68,15 @@ Cancel a pending task:
 
     .\.venv\Scripts\el-agent.exe cancel TASK_ID
 
-The API documentation is available locally at http://127.0.0.1:8765/docs.
+Optional: start the local Agent automatically after this Windows user signs in (no administrator elevation required):
+
+    .\\install-startup.ps1
+
+Remove that startup task at any time with:
+
+    .\\uninstall-startup.ps1
+
+This startup option runs the loopback-only API in the background; it does not enable remote access. The API documentation is available locally at http://127.0.0.1:8765/docs.
 
 ## Security boundaries
 
