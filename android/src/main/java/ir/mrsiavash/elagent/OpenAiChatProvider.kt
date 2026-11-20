@@ -30,9 +30,18 @@ class OpenAiChatProvider(
             "Cloud model name is invalid."
         }
         val parsed = java.net.URI(endpoint)
-        require(parsed.scheme == "https" || (
-            parsed.scheme == "http" && parsed.host in setOf("127.0.0.1", "localhost")
-        )) { "Cloud endpoint must use HTTPS." }
+        val officialEndpoint = parsed.scheme == "https" &&
+            parsed.host == "api.openai.com" &&
+            parsed.path == "/v1/chat/completions" &&
+            parsed.userInfo == null && parsed.query == null && parsed.fragment == null
+        val loopbackTestEndpoint = parsed.scheme == "http" &&
+            parsed.host in setOf("127.0.0.1", "localhost")
+        require(officialEndpoint || loopbackTestEndpoint) {
+            "Cloud endpoint must be the official API HTTPS endpoint."
+        }
+        require(!client.followRedirects && !client.followSslRedirects) {
+            "Cloud provider client must refuse redirects."
+        }
     }
 
     fun chat(prompt: String): String {
