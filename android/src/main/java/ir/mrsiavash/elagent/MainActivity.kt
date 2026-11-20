@@ -241,11 +241,6 @@ class MainActivity : Activity() {
         }
     }
 
-    /**
-     * A visible, owner-initiated action. Android never launches a remote app task
-     * silently in the background; the owner taps this button while the companion
-     * is foregrounded. Unsupported Windows-only aliases are reported as failures.
-     */
     private fun toggleVoice() {
         if (voiceActive) {
             voiceController.stop()
