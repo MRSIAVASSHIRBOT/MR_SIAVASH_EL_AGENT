@@ -1,6 +1,9 @@
 package ir.mrsiavash.elagent
 
 import android.app.Activity
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.ViewGroup
 import android.widget.Button
@@ -80,6 +83,34 @@ class MainActivity : Activity() {
             }
         }, buttonParams())
         root.addView(Button(this).apply {
+            text = "Check and run one approved Hub task"
+            setOnClickListener {
+                setBusy("Checking approved tasks…")
+                executor.execute {
+                    val result = runCatching {
+                        val client = HubClient(store)
+                        val task = client.claimNextTask()
+                        if (task == null) "No pending task."
+                        else {
+                            val taskId = task.getString("task_id")
+                            val alias = task.optString("app_alias")
+                            val launch = runCatching { launchAllowlisted(alias) }
+                            val outcome = if (launch.isSuccess) "succeeded" else "failed"
+                            val code = if (launch.isSuccess) "launched" else launch.exceptionOrNull()?.message ?: "unsupported_platform"
+                            val safeCode = when (code) {
+                                "launched", "app_not_available", "unsupported_platform", "launch_failed" -> code
+                                else -> "launch_failed"
+                            }
+                            val state = client.completeTask(taskId, outcome, safeCode)
+                            "Task $taskId: $state ($safeCode)"
+                        }
+                    }
+                    result.onSuccess { message -> runOnUiThread { setStatus(message) } }
+                        .onFailure { error -> runOnUiThread { setStatus(error.message ?: "Task check failed.") } }
+                }
+            }
+        }, buttonParams())
+        root.addView(Button(this).apply {
             text = "Unpair locally"
             setOnClickListener {
                 store.clearCredentialsPreservingIdentity()
@@ -90,6 +121,22 @@ class MainActivity : Activity() {
         status = TextView(this).apply { text = "Not connected"; textSize = 14f }
         root.addView(status, fieldParams())
         if (HubClient(store).isPaired()) scheduleHeartbeat()
+    }
+
+    private fun launchAllowlisted(alias: String) {
+        when (alias) {
+            "chatgpt" -> {
+                val appIntent = packageManager.getLaunchIntentForPackage("com.openai.chatgpt")
+                if (appIntent != null) {
+                    startActivity(appIntent)
+                } else {
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://chatgpt.com/")))
+                }
+            }
+            "browser" -> startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com/")))
+            "notepad", "calculator", "explorer" -> throw IllegalStateException("unsupported_platform")
+            else -> throw IllegalStateException("unsupported_platform")
+        }
     }
 
     private fun fieldParams() = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
