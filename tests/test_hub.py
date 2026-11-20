@@ -37,6 +37,8 @@ def _token_response(access="a", refresh="r"):
 
 def _use_tmp_data_dir(monkeypatch, tmp_path):
     monkeypatch.setattr(hub, "data_dir", lambda: tmp_path)
+    # Keep ordinary unit tests isolated from a developer/runner Windows vault.
+    monkeypatch.setattr(hub.platform, "system", lambda: "Linux")
 
 
 def test_device_id_is_stable_and_pairing_request_is_least_privilege(tmp_path, monkeypatch):
