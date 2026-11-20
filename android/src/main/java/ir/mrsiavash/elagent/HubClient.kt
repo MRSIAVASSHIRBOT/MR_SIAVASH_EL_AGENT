@@ -10,6 +10,15 @@ import org.json.JSONObject
 import java.net.URI
 import java.util.concurrent.TimeUnit
 
+data class AndroidDeviceTaskClaim(
+    val taskId: String,
+    val action: String,
+    val app: String?,
+    val ownerConfirmed: Boolean,
+    val timeoutSeconds: Long,
+    val leaseToken: String
+)
+
 class HubClient(private val store: SecureStore) {
     private val http = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
@@ -70,8 +79,12 @@ class HubClient(private val store: SecureStore) {
             "Hub returned invalid credential lifetimes."
         }
         val scopes = result.optJSONArray("scopes") ?: throw IllegalStateException("Hub omitted granted scopes.")
-        require(scopes.length() == 1 && scopes.optString(0) == "device.heartbeat") {
-            "This Android preview accepts only the device.heartbeat scope. Create a new pairing challenge with that single scope."
+        val grantedScopes = (0 until scopes.length()).map { scopes.optString(it) }.toSet()
+        require(
+            "device.heartbeat" in grantedScopes &&
+            grantedScopes.all { it == "device.heartbeat" || it == "app.launch" }
+        ) {
+            "Android supports only device.heartbeat and app.launch scopes in this preview."
         }
         val now = System.currentTimeMillis()
         val saved = store.read()
@@ -105,15 +118,75 @@ class HubClient(private val store: SecureStore) {
             val refresh = refreshed.optString("refresh_token")
             val accessTtl = refreshed.optLong("expires_in", -1)
             val refreshTtl = refreshed.optLong("refresh_expires_in", -1)
-            require(access.length >= 40 && refresh.length >= 40 && accessTtl in 30L..3600L && refreshTtl in 3600L..(90L * 24 * 3600)) {
-                "Hub returned invalid refreshed credentials."
+            val scopes = refreshed.optJSONArray("scopes") ?: throw IllegalStateException("Hub omitted refreshed scopes.")
+            val grantedScopes = (0 until scopes.length()).map { scopes.optString(it) }.toSet()
+            require(
+                access.length >= 40 && refresh.length >= 40 &&
+                accessTtl in 30L..3600L && refreshTtl in 3600L..(90L * 24 * 3600) &&
+                "device.heartbeat" in grantedScopes &&
+                grantedScopes.all { it == "device.heartbeat" || it == "app.launch" }
+            ) {
+                "Hub returned invalid refreshed credentials or unsupported scopes."
             }
             saved.put("access_token", access)
                 .put("refresh_token", refresh)
                 .put("access_expires_at", System.currentTimeMillis() + accessTtl * 1000L)
                 .put("refresh_expires_at", System.currentTimeMillis() + refreshTtl * 1000L)
+                .put("scopes", scopes)
             store.write(saved)
             saved
+        }
+    }
+
+    fun claimTask(): AndroidDeviceTaskClaim? {
+        val saved = refreshIfNeeded()
+        val scopes = saved.optJSONArray("scopes") ?: return null
+        val grantedScopes = (0 until scopes.length()).map { scopes.optString(it) }.toSet()
+        if ("app.launch" !in grantedScopes) return null
+
+        val response = request(
+            saved.getString("hub_url"), "/devices/tasks/claim", JSONObject(),
+            saved.getString("access_token"), saved.getString("device_id")
+        )
+        val task = response.optJSONObject("task") ?: return null
+        val taskId = task.optString("task_id")
+        val action = task.optString("action")
+        val requiredScope = task.optString("required_scope")
+        val app = if (task.isNull("app")) null else task.optString("app")
+        val timeout = task.optLong("timeout_seconds", -1)
+        val lease = response.optString("lease_token")
+        require(taskId.isNotBlank() && action == "app.launch" && requiredScope == "app.launch") {
+            "Hub returned an unsupported Android task contract."
+        }
+        require("app.launch" in grantedScopes && app in setOf("chatgpt", "browser", "notepad", "calculator", "explorer")) {
+            "Task action is not supported by the Android companion."
+        }
+        require(timeout in 5L..60L && lease.length in 40..128) {
+            "Hub returned an invalid task lease or timeout."
+        }
+        return AndroidDeviceTaskClaim(
+            taskId, action, app, task.optBoolean("owner_confirmed", false), timeout, lease
+        )
+    }
+
+    fun completeTask(
+        claim: AndroidDeviceTaskClaim,
+        succeeded: Boolean,
+        errorCode: String?,
+        durationMs: Long
+    ) {
+        val saved = refreshIfNeeded()
+        val payload = JSONObject()
+            .put("lease_token", claim.leaseToken)
+            .put("outcome", if (succeeded) "succeeded" else "failed")
+            .put("duration_ms", durationMs.coerceIn(0L, 60_000L))
+        if (!succeeded) payload.put("error_code", errorCode ?: "execution_failed")
+        val response = request(
+            saved.getString("hub_url"), "/devices/tasks/${claim.taskId}/complete", payload,
+            saved.getString("access_token"), saved.getString("device_id")
+        )
+        require(response.optJSONObject("task") != null) {
+            "Hub did not confirm that the task outcome was recorded."
         }
     }
 
