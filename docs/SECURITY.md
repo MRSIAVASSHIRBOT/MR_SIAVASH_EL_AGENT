@@ -14,7 +14,10 @@ Run as the normal desktop user, not elevated administrator. Keep the token priva
 - The Android planner sends only the user-entered request text after an explicit button press.
 - The API key is stored in the Android Keystore-encrypted local payload; it is sent only in the Authorization header to the fixed official OpenAI HTTPS endpoint.
 - Redirects are refused, request and response sizes are bounded, and no provider key is written to logs or prompts.
-- Planner output is a proposal, not an executable command. The app requests strict JSON Schema output and independently validates operation types, URL schemes, step IDs, dependencies, and size limits.
-- The planner currently supports preview-only operations: the fixed ChatGPT/browser aliases, HTTPS URL proposals, user-selected document reading, and plain-text display. It does not execute generated steps.
+- Planner output is parsed into a typed proposal; it is never interpreted as shell, script, or arbitrary executable code. The app requests strict JSON Schema output and independently validates operation types, URL schemes, step IDs, dependencies, and size limits.
+- Supported operations are limited to fixed ChatGPT/browser aliases, HTTPS navigation, user-selected document reading, and plain-text display. Each step requires an owner confirmation dialog and an exact session-scoped action ID.
+- The central capability policy is checked immediately before an adapter executes. External intents are only recorded as dispatched, not completed, until the owner returns and explicitly verifies the outcome.
+- Document steps open Android's system picker. The selected resource must return `FLAG_GRANT_READ_URI_PERMISSION` before the app reads its bounded local text preview.
+- A failed step stops the plan. The execution ledger is in-memory only, so activity/process recreation loses the plan state and never triggers automatic action replay.
 - File contents, microphone audio, screenshots, Hub credentials, and local memory are not included in planner requests.
 - API usage can incur provider charges separate from a ChatGPT subscription. The owner must explicitly save an API key in the app and tap the planning action.
