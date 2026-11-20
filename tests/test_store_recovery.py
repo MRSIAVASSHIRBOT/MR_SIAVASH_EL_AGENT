@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import threading
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -86,11 +87,21 @@ def test_scheduler_startup_reconciles_running_rows_before_polling(tmp_path: Path
     task = store.create_launch(now - timedelta(seconds=1), "notepad")
     assert len(store.claim_due(now)) == 1
     launched = []
+    recovery_finished = threading.Event()
+    original_reconcile = store.reconcile_interrupted
+
+    def reconcile_and_signal(current=None):
+        result = original_reconcile(current)
+        recovery_finished.set()
+        return result
+
+    monkeypatch.setattr(store, "reconcile_interrupted", reconcile_and_signal)
     monkeypatch.setattr(service, "launch_app", lambda alias: launched.append(alias))
 
     async def run_once():
         worker = asyncio.create_task(service.scheduler_loop(store))
-        await asyncio.sleep(0.02)
+        completed = await asyncio.to_thread(recovery_finished.wait, 5)
+        assert completed, "scheduler startup recovery did not complete"
         worker.cancel()
         with pytest.raises(asyncio.CancelledError):
             await worker
