@@ -38,7 +38,9 @@
 - [ ] Owner-approved preference and procedural memory
 - [ ] Bounded multi-step planning
 - [ ] Self-evaluation and safe recovery
-- [x] Windows local-first text provider core: Ollama local mode, explicit online/hybrid modes, bounded requests, and OS credential-store-backed API key handling.\n- [ ] Windows 11 acceptance for Ollama latency and native credential-store behavior.\n- [ ] Cross-device orchestration
+- [x] Windows local-first text provider core: Ollama local mode, explicit online/hybrid modes, bounded requests, and OS credential-store-backed API key handling.
+- [ ] Windows 11 acceptance for Ollama latency and native credential-store behavior.
+- [ ] Cross-device orchestration
 
 No item is complete until code, tests, privacy review, and platform acceptance evidence exist.
 
