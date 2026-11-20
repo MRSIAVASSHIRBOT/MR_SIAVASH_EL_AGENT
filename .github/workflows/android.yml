@@ -48,7 +48,7 @@ jobs:
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
           ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
-        run: gradle --no-daemon :android:assembleDebug
+        run: gradle --no-daemon :android:testDebugUnitTest :android:assembleDebug
       - name: Upload debug APK artifact
         uses: actions/upload-artifact@v4
         with:
