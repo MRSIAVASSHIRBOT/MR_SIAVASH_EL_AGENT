@@ -14,6 +14,7 @@ from el_agent.intent import parse_local_intent
 from el_agent.hub import hub_status
 from el_agent.security import load_token
 from el_agent.api import create_app
+from el_agent.voice import get_voice_setup_status, listen_once, speak_text, VoiceUnavailable
 import uvicorn
 
 API = "http://127.0.0.1:8765"
@@ -41,8 +42,8 @@ class DesktopControlCenter:
     def __init__(self, root: tk.Tk):
         self.root = root
         root.title("MR_SIAVASH_EL_AGENT")
-        root.geometry("760x590")
-        root.minsize(640, 480)
+        root.geometry("760x680")
+        root.minsize(640, 560)
 
         outer = ttk.Frame(root, padding=16)
         outer.pack(fill="both", expand=True)
@@ -56,6 +57,17 @@ class DesktopControlCenter:
         entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
         entry.bind("<Return>", lambda _event: self.run_command())
         ttk.Button(command_frame, text="اجرا", command=self.run_command).pack(side="right")
+
+        voice_frame = ttk.LabelFrame(outer, text="فرمان صوتی (Push-to-Talk)", padding=10)
+        voice_frame.pack(fill="x", pady=5)
+        self.voice_status = tk.StringVar(value="میکروفون خاموش است.")
+        ttk.Label(voice_frame, textvariable=self.voice_status).pack(side="left", fill="x", expand=True)
+        self.voice_start_button = ttk.Button(voice_frame, text="شروع ضبط صدا", command=self.start_voice)
+        self.voice_start_button.pack(side="left", padx=4)
+        self.voice_stop_button = ttk.Button(voice_frame, text="پایان ضبط", command=self.stop_voice, state="disabled")
+        self.voice_stop_button.pack(side="left")
+        self._voice_stop_event = None
+        self._voice_thread = None
 
         action_frame = ttk.LabelFrame(outer, text="عملیات مجاز", padding=10)
         action_frame.pack(fill="x", pady=5)
@@ -90,10 +102,102 @@ class DesktopControlCenter:
         ttk.Button(controls, text="به‌روزرسانی", command=self.refresh_tasks).pack(side="left")
         ttk.Button(controls, text="لغو وظیفه انتخاب‌شده", command=self.cancel_selected).pack(side="left", padx=6)
 
+        root.protocol("WM_DELETE_WINDOW", self.close)
+
         self.status = tk.StringVar(value="در حال اتصال به Agent محلی…")
         ttk.Label(outer, textvariable=self.status, relief="sunken", anchor="w").pack(fill="x", pady=(8, 0))
         self.refresh_tasks()
         root.after(5000, self._poll_tasks)
+
+    def start_voice(self):
+        if self._voice_thread is not None and self._voice_thread.is_alive():
+            return
+        setup = get_voice_setup_status()
+        if not setup["ready"]:
+            missing = ", ".join(setup["missing_packages"]) or "none"
+            message = (
+                "برای فعال‌سازی گفتار محلی ابتدا وابستگی‌های اختیاری و مدل فارسی Vosk را نصب کن.\n"
+                "Missing packages: " + missing + "\n"
+                "Model configured: " + str(setup["model_configured"]) + "\n"
+                'Install: python -m pip install -e ".[voice]"\n'
+                "Then set EL_AGENT_VOSK_MODEL to the extracted model directory."
+            )
+            self.voice_status.set("تنظیمات گفتار کامل نیست؛ میکروفون فعال نشد.")
+            messagebox.showwarning("راه‌اندازی فرمان صوتی", message, parent=self.root)
+            return
+
+        stop_event = threading.Event()
+        self._voice_stop_event = stop_event
+        self.voice_start_button.configure(state="disabled")
+        self.voice_stop_button.configure(state="normal")
+        self.voice_status.set("میکروفون فعال است؛ صحبت کن و سپس «پایان ضبط» را بزن.")
+
+        def worker():
+            try:
+                transcript = listen_once(stop_event, max_seconds=15)
+            except Exception as exc:
+                message = str(exc)
+                self.root.after(0, lambda value=message: self._voice_error(value))
+                return
+            self.root.after(0, lambda value=transcript: self._handle_voice_transcript(value))
+
+        self._voice_thread = threading.Thread(target=worker, name="el-agent-push-to-talk", daemon=True)
+        self._voice_thread.start()
+
+    def stop_voice(self):
+        if self._voice_stop_event is not None:
+            self._voice_stop_event.set()
+            self.voice_status.set("در حال پایان‌دادن به ضبط…")
+
+    def _voice_finished(self):
+        self._voice_stop_event = None
+        self.voice_start_button.configure(state="normal")
+        self.voice_stop_button.configure(state="disabled")
+
+    def _voice_error(self, message: str):
+        self._voice_finished()
+        self.voice_status.set("فرمان صوتی انجام نشد: " + message)
+        self.status.set("فرمان صوتی انجام نشد؛ هیچ عملیاتی اجرا نشد.")
+
+    def _handle_voice_transcript(self, transcript: str):
+        self._voice_finished()
+        self.command.set(transcript)
+        self.voice_status.set("متن تشخیص‌داده‌شده: " + transcript)
+        parsed = parse_local_intent(transcript)
+        if parsed is None:
+            self.status.set("فرمان شنیده شد اما در فهرست مجاز نیست؛ هیچ عملیاتی اجرا نشد.")
+            return
+        self._execute_intent(parsed, spoken=True)
+
+    def _speak_reply(self, reply: str):
+        try:
+            speak_text(reply)
+            self.root.after(0, lambda: self.voice_status.set("پاسخ صوتی پخش شد."))
+        except VoiceUnavailable:
+            self.root.after(0, lambda: self.voice_status.set("پاسخ متنی آماده است؛ صدای فارسی سیستم در دسترس نیست."))
+
+    def _execute_intent(self, parsed: dict[str, str], *, spoken: bool = False):
+        try:
+            if parsed["action"] == "screenshot":
+                result = _request("POST", "/v1/screenshot")
+                reply = "اسکرین‌شات به‌صورت محلی ذخیره شد."
+                self.status.set("Screenshot ذخیره شد: " + result.get("local_path", result.get("filename", "")))
+            else:
+                alias = parsed["app_alias"]
+                result = _request("POST", f"/v1/apps/{alias}/launch")
+                reply = result.get("detail", "برنامه اجرا شد.")
+                self.status.set(reply)
+            if not spoken:
+                self.command.set("")
+            else:
+                threading.Thread(target=self._speak_reply, args=(reply,), name="el-agent-tts", daemon=True).start()
+        except Exception as exc:
+            self._show_error(exc)
+
+    def close(self):
+        if self._voice_stop_event is not None:
+            self._voice_stop_event.set()
+        self.root.destroy()
 
     def _show_error(self, exc: Exception):
         self.status.set(str(exc))
@@ -104,17 +208,7 @@ class DesktopControlCenter:
         if parsed is None:
             self.status.set("فرمان شناخته نشد؛ فقط عملیات مجاز و مشخص پشتیبانی می‌شوند.")
             return
-        try:
-            if parsed["action"] == "screenshot":
-                result = _request("POST", "/v1/screenshot")
-                self.status.set("Screenshot ذخیره شد: " + result.get("local_path", result.get("filename", "")))
-            else:
-                alias = parsed["app_alias"]
-                result = _request("POST", f"/v1/apps/{alias}/launch")
-                self.status.set(result.get("detail", "برنامه اجرا شد."))
-            self.command.set("")
-        except Exception as exc:
-            self._show_error(exc)
+        self._execute_intent(parsed)
 
     def launch_selected(self):
         try:

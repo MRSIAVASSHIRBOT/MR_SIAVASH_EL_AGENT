@@ -28,3 +28,15 @@ def test_unknown_or_unsafe_command_is_not_executed():
 
 def test_oversized_command_is_rejected():
     assert parse_local_intent("باز کن " + "x" * 300) is None
+
+
+def test_wake_word_prefix_is_accepted_by_the_safe_command_parser():
+    assert parse_local_intent("سیا، ماشین حساب رو باز کن") == {
+        "action": "launch",
+        "app_alias": "calculator",
+    }
+    assert parse_local_intent("سیا برو داخل چت جی پی تی") == {
+        "action": "launch",
+        "app_alias": "chatgpt",
+    }
+    assert parse_local_intent("سیا") is None
