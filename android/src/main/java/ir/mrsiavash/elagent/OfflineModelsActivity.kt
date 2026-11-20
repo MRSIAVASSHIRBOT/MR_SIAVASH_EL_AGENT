@@ -7,6 +7,8 @@ import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
@@ -42,7 +44,7 @@ class OfflineModelsActivity : Activity() {
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(24, 28, 24, 28)
-            setBackgroundColor(Color.rgb(7, 22, 16))
+            setBackgroundColor(Color.rgb(13, 19, 30))
         }
         val scroll = ScrollView(this).apply {
             isFillViewport = true
@@ -53,13 +55,13 @@ class OfflineModelsActivity : Activity() {
         content.addView(TextView(this).apply {
             text = "مدیریت موتورهای آفلاین"
             textSize = 23f
-            setTextColor(Color.rgb(88, 218, 165))
+            setTextColor(Color.rgb(95, 202, 176))
         }, params())
 
         content.addView(TextView(this).apply {
             text = "فایل مدل را فقط از منبع رسمی درج‌شده تهیه کن و از اینجا انتخابش کن. فایل اصلی در محل خودش باقی می‌ماند و یک نسخهٔ خصوصی داخل برنامه ذخیره می‌شود."
             textSize = 14f
-            setTextColor(Color.rgb(210, 226, 217))
+            setTextColor(Color.rgb(214, 225, 238))
         }, params())
 
         content.addView(TextView(this).apply {
@@ -72,13 +74,13 @@ class OfflineModelsActivity : Activity() {
             content.addView(TextView(this).apply {
                 text = spec.displayName
                 textSize = 17f
-                setTextColor(Color.rgb(236, 250, 242))
+                setTextColor(Color.rgb(242, 246, 252))
             }, params())
 
             content.addView(TextView(this).apply {
                 text = "نام فایل: ${spec.fileName}\nحجم مجاز: ${formatBytes(spec.minimumBytes)} تا ${formatBytes(spec.maximumBytes)}\nمنبع: ${spec.sourcePage}"
                 textSize = 12f
-                setTextColor(Color.rgb(168, 196, 183))
+                setTextColor(Color.rgb(161, 174, 195))
                 setTextIsSelectable(true)
             }, params())
 
@@ -104,7 +106,7 @@ class OfflineModelsActivity : Activity() {
 
         status = TextView(this).apply {
             textSize = 14f
-            setTextColor(Color.rgb(88, 218, 165))
+            setTextColor(Color.rgb(95, 202, 176))
             setTextIsSelectable(true)
         }
         content.addView(status, params())
@@ -116,6 +118,50 @@ class OfflineModelsActivity : Activity() {
         }, params())
 
         refreshStatus()
+        applyVisualRefresh(scroll)
+    }
+
+    private fun applyVisualRefresh(root: android.view.ViewGroup) {
+        val scale = resources.displayMetrics.density
+        fun dp(value: Int) = (value * scale).toInt()
+        fun walk(group: android.view.ViewGroup) {
+            for (i in 0 until group.childCount) {
+                val view = group.getChildAt(i)
+                when (view) {
+                    is Button -> {
+                        val primary = view.text?.toString().orEmpty().contains("اجرای آزمایشی") ||
+                            view.text?.toString().orEmpty().contains("ضبط و تبدیل")
+                        view.background = GradientDrawable(
+                            GradientDrawable.Orientation.TOP_BOTTOM,
+                            intArrayOf(if (primary) Color.rgb(61, 177, 149) else Color.rgb(32, 42, 59),
+                                if (primary) Color.rgb(38, 132, 125) else Color.rgb(24, 31, 45))
+                        ).apply { cornerRadius = dp(16).toFloat() }
+                        view.setTextColor(if (primary) Color.rgb(8, 20, 24) else Color.rgb(229, 237, 248))
+                        view.isAllCaps = false
+                        view.typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                        view.textSize = 14f
+                        view.minimumHeight = dp(52)
+                        view.setPadding(dp(16), dp(12), dp(16), dp(12))
+                    }
+                    is EditText -> {
+                        view.background = GradientDrawable().apply {
+                            setColor(Color.rgb(22, 29, 43))
+                            cornerRadius = dp(14).toFloat()
+                            setStroke(dp(1), Color.rgb(48, 61, 81))
+                        }
+                        view.setPadding(dp(14), dp(12), dp(14), dp(12))
+                    }
+                    is TextView -> {
+                        view.typeface = Typeface.create(
+                            if (view.textSize / scale >= 18) "sans-serif-medium" else "sans-serif",
+                            Typeface.NORMAL
+                        )
+                    }
+                    is android.view.ViewGroup -> walk(view)
+                }
+            }
+        }
+        walk(root)
     }
 
     private fun chooseModelFile(modelId: String) {
