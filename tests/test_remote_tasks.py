@@ -20,6 +20,7 @@ def _claimed(action="app.launch", app="notepad", *, owner_confirmed=False, scope
         },
         "task": {
             "task_id": "00000000-0000-0000-0000-000000000002",
+            "device_id": "00000000-0000-0000-0000-000000000001",
             "action": action,
             "app": app,
             "required_scope": scope,
@@ -90,6 +91,7 @@ def test_screenshot_requires_owner_confirmation(monkeypatch):
 
     assert captured == []
     assert result["reported_status"] == "reported_failed"
+    assert result["action_attempted"] is False
     assert reports[0]["error_code"] == "permission_denied"
 
 
@@ -196,3 +198,20 @@ def test_action_finishing_after_lease_expiry_is_not_reported_or_replayed(monkeyp
     assert result["action_attempted"] is True
 
 
+
+
+def test_task_for_different_device_is_rejected_before_action(monkeypatch):
+    claimed = _claimed()
+    claimed["task"]["device_id"] = "00000000-0000-0000-0000-000000000099"
+    launched = []
+    monkeypatch.setattr(remote_tasks, "launch_app", lambda alias: launched.append(alias))
+    monkeypatch.setattr(
+        remote_tasks,
+        "_post",
+        lambda *_args, **_kwargs: pytest.fail("wrong-device task must not be reported"),
+    )
+
+    with pytest.raises(remote_tasks.HubClientError, match="different device"):
+        remote_tasks.execute_claimed(claimed)
+
+    assert launched == []
