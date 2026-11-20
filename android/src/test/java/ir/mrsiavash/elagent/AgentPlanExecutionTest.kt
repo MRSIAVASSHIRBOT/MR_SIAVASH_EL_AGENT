@@ -38,7 +38,7 @@ class AgentPlanExecutionTest {
         session.markDispatched("open")
         assertEquals(PlanStepState.DISPATCHED, session.record("open").state)
         assertNull(session.nextRunnableStep())
-        assertThrows(IllegalStateException::class.java) { session.markCompleted("open") }
+        assertThrows(IllegalArgumentException::class.java) { session.markCompleted("open") }
         session.markCompleted("open", ownerVerified = true)
         assertEquals("display", session.nextRunnableStep()?.id)
     }
@@ -58,7 +58,7 @@ class AgentPlanExecutionTest {
         session.markFailed("open", "Intent dispatch failed")
         assertNull(session.nextRunnableStep())
         assertFalse(session.isComplete())
-        assertThrows(IllegalArgumentException::class.java) { session.markCompleted("open") }
+        assertThrows(IllegalStateException::class.java) { session.markCompleted("open") }
     }
 
     @Test fun localDisplayCanCompleteOnlyWhenItIsNext() {
@@ -79,6 +79,32 @@ class AgentPlanExecutionTest {
         session.markDispatched("open")
         assertThrows(IllegalArgumentException::class.java) {
             session.markCompleted("open", ownerVerified = false)
+        }
+    }
+
+    @Test fun rejectsArbitraryAppAliasesAndUnsafeUrlEvenWhenTypedDirectly() {
+        val arbitraryApp = step("launch", AgentOperation.OPEN_APP, target = "com.attacker.app")
+        val unsafeUrl = step("navigate", AgentOperation.OPEN_URL, target = "javascript:alert(1)")
+        val appDecision = AgentPlanExecutionPolicy.evaluate(
+            arbitraryApp, PlanPolicyContext("session:launch", true, true)
+        )
+        val urlDecision = AgentPlanExecutionPolicy.evaluate(
+            unsafeUrl, PlanPolicyContext("session:navigate", true, true)
+        )
+        assertFalse(appDecision.allowed)
+        assertFalse(urlDecision.allowed)
+    }
+
+    @Test fun rejectsExecutionPlanWithForwardDependency() {
+        val invalid = AgentPlan(
+            "Invalid ordering",
+            listOf(
+                step("second", AgentOperation.SHOW_TEXT, dependencies = listOf("first"), text = "later"),
+                step("first", AgentOperation.SHOW_TEXT, text = "first")
+            )
+        )
+        assertThrows(IllegalArgumentException::class.java) {
+            AgentPlanExecutionSession(invalid, "session-0001")
         }
     }
 
