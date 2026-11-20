@@ -59,13 +59,79 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         store = SecureStore(this)
-        val root = LinearLayout(this).apply {
+        val shell = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.rgb(7, 19, 15))
-            setPadding(28, 36, 28, 28)
+            setBackgroundColor(Color.rgb(5, 16, 12))
         }
-        val scroll = ScrollView(this).apply { addView(root) }
-        setContentView(scroll)
+        val pageHost = android.widget.FrameLayout(this)
+        fun createPage(): Pair<ScrollView, LinearLayout> {
+            val content = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(22, 28, 22, 28)
+                setBackgroundColor(Color.rgb(7, 22, 16))
+            }
+            val page = ScrollView(this).apply {
+                isFillViewport = true
+                addView(content)
+            }
+            pageHost.addView(page, android.widget.FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+            ))
+            return page to content
+        }
+        val (homePage, homeContent) = createPage()
+        val (aiPage, aiContent) = createPage()
+        val (toolsPage, toolsContent) = createPage()
+        val (settingsPage, settingsContent) = createPage()
+        val pages = listOf(homePage, aiPage, toolsPage, settingsPage)
+        val navigation = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(8, 8, 8, 12)
+            setBackgroundColor(Color.rgb(8, 28, 20))
+        }
+        val navigationButtons = mutableListOf<Button>()
+        fun selectPage(index: Int) {
+            pages.forEachIndexed { pageIndex, page ->
+                page.visibility = if (pageIndex == index) ViewGroup.VISIBLE else ViewGroup.GONE
+            }
+            navigationButtons.forEachIndexed { buttonIndex, button ->
+                val selected = buttonIndex == index
+                button.backgroundTintList = ColorStateList.valueOf(
+                    if (selected) Color.rgb(20, 185, 129) else Color.rgb(13, 43, 30)
+                )
+                button.setTextColor(if (selected) Color.BLACK else Color.rgb(190, 220, 204))
+            }
+        }
+        listOf("خانه", "هوش مصنوعی", "ابزارها", "اتصال").forEachIndexed { index, label ->
+            val button = Button(this).apply {
+                text = label
+                textSize = 12f
+                isAllCaps = false
+                setPadding(2, 8, 2, 8)
+                setOnClickListener { selectPage(index) }
+            }
+            navigationButtons += button
+            navigation.addView(button, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        }
+        shell.addView(pageHost, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
+        ))
+        shell.addView(navigation, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ))
+        setContentView(shell)
+        selectPage(0)
+        var root: LinearLayout = homeContent
+        homeContent.addView(TextView(this).apply {
+            text = "دستیار شخصی هوشمند"
+            textSize = 26f
+            setTextColor(Color.rgb(236, 250, 242))
+        }, fieldParams())
+        homeContent.addView(TextView(this).apply {
+            text = "MR SIAVASH EL AGENT  ·  کنترل‌پنل Android"
+            textSize = 13f
+            setTextColor(Color.rgb(88, 218, 165))
+        }, fieldParams())
 
         root.addView(TextView(this).apply {
             text = "MR SIAVASH EL AGENT"
@@ -82,7 +148,26 @@ class MainActivity : Activity() {
             textSize = 12f
             setTextColor(Color.rgb(53, 214, 160))
             setTextIsSelectable(true)
-        })
+        }, fieldParams())
+        root = settingsContent
+        root.addView(TextView(this).apply {
+            text = "اتصال دستگاه و مخاطب سریع"
+            textSize = 19f
+            setTextColor(Color.rgb(88, 218, 165))
+        }, fieldParams())
+        root.addView(Button(this).apply {
+            text = "انتخاب مخاطب پدر از مخاطبین گوشی"
+            isAllCaps = false
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(15, 65, 43))
+            setTextColor(Color.rgb(225, 248, 235))
+            setOnClickListener { chooseFatherContact() }
+        }, buttonParams())
+        fatherContactStatus = TextView(this).apply {
+            text = fatherContactSummary()
+            textSize = 13f
+            setTextColor(Color.rgb(190, 215, 199))
+        }
+        root.addView(fatherContactStatus, fieldParams())
         hubUrl = EditText(this).apply {
             hint = "Hub HTTPS address (https://...)"
             setTextColor(Color.WHITE)
@@ -126,13 +211,28 @@ class MainActivity : Activity() {
                 }
             }
         }, buttonParams())
+        root = homeContent
         voiceButton = Button(this).apply {
-            text = "شروع فرمان صوتی (محلی)"
+            text = "🎙  صحبت با سیا"
+            textSize = 18f
+            isAllCaps = false
+            minHeight = 72
             backgroundTintList = ColorStateList.valueOf(Color.rgb(19, 185, 129))
             setTextColor(Color.BLACK)
             setOnClickListener { toggleVoice() }
         }
         root.addView(voiceButton, buttonParams())
+        root.addView(TextView(this).apply {
+            text = "برای فرمان صوتی، دکمه را بزن و بعد از شنیدن صدای آماده‌باش صحبت کن. تشخیص گفتار فعلاً با موتور آفلاین Android انجام می‌شود."
+            textSize = 12f
+            setTextColor(Color.rgb(176, 204, 188))
+        }, fieldParams())
+        root = toolsContent
+        root.addView(TextView(this).apply {
+            text = "ابزارهای دستگاه"
+            textSize = 21f
+            setTextColor(Color.rgb(88, 218, 165))
+        }, fieldParams())
         root.addView(Button(this).apply {
             text = "Open ChatGPT"
             backgroundTintList = ColorStateList.valueOf(Color.rgb(13, 33, 25))
@@ -168,6 +268,12 @@ class MainActivity : Activity() {
             setTextIsSelectable(true)
         }
         root.addView(documentPreview, fieldParams())
+        root = aiContent
+        root.addView(TextView(this).apply {
+            text = "هوش مصنوعی و برنامه‌ریز"
+            textSize = 21f
+            setTextColor(Color.rgb(88, 218, 165))
+        }, fieldParams())
         root.addView(TextView(this).apply {
             text = "برنامه‌ریز هوشمند · تبدیل درخواست به مراحل ساختاریافته"
             textSize = 17f
@@ -240,6 +346,12 @@ class MainActivity : Activity() {
             setOnClickListener { confirmDispatchedStepCompletion() }
         }
         root.addView(executionVerifyButton, buttonParams())
+        root = settingsContent
+        root.addView(TextView(this).apply {
+            text = "اتصال به MR_SIAVASH_HUB_AI"
+            textSize = 19f
+            setTextColor(Color.rgb(88, 218, 165))
+        }, fieldParams())
         root.addView(Button(this).apply {
             text = "Unpair locally"
             backgroundTintList = ColorStateList.valueOf(Color.rgb(74, 36, 31))
@@ -250,7 +362,14 @@ class MainActivity : Activity() {
                 setStatus("Local credentials cleared. Revoke the device in Hub to fully disconnect.")
             }
         }, buttonParams())
-        status = TextView(this).apply { text = "Not connected"; textSize = 14f; setTextColor(Color.rgb(168, 196, 183)) }
+        root = homeContent
+        status = TextView(this).apply {
+            text = "آماده‌به‌کار · منتظر فرمان شما"
+            textSize = 14f
+            setTextColor(Color.rgb(168, 196, 183))
+            setPadding(16, 18, 16, 18)
+            setBackgroundColor(Color.rgb(12, 39, 27))
+        }
         root.addView(status, fieldParams())
         voiceController = LocalVoiceController(this, ::setStatus, ::handleVoiceTranscript, ::finishVoiceUi)
         if (HubClient(store).isPaired()) {
