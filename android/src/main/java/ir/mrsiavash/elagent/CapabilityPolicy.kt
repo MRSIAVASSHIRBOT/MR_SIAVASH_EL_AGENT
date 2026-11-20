@@ -35,6 +35,7 @@ data class ActionContext(
     val grantedCapabilities: Set<CapabilityId> = emptySet(),
     val userSelectedResources: Set<CapabilityId> = emptySet(),
     val accessibilityServiceEnabled: Boolean = false,
+    val ownerTaskId: String? = null,
     val ownerAuthorizedTaskIds: Set<String> = emptySet(),
     val confirmedActionIds: Set<String> = emptySet()
 )
@@ -79,7 +80,8 @@ object CapabilityCatalog {
         if (spec.grant == GrantRequirement.BLOCKED) return PolicyDecision(false, false, spec.description)
         if (context.actionId.isBlank()) return PolicyDecision(false, false, "A stable action identifier is required.")
 
-        val ownerAuthorized = context.actionId in context.ownerAuthorizedTaskIds
+        val ownerAuthorized = context.ownerTaskId != null &&
+            context.ownerTaskId in context.ownerAuthorizedTaskIds
         if (!context.appInForeground && !ownerAuthorized) {
             return PolicyDecision(false, false, "A foreground session or previously owner-authorized task is required.")
         }
