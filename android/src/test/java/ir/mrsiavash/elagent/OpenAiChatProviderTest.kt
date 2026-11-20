@@ -73,4 +73,15 @@ class OpenAiChatProviderTest {
             OpenAiChatProvider("test-api-key-that-is-long-enough", "test-model", "http://example.com/chat")
         }
     }
+    @Test
+    fun rejectsNonOfficialHttpsHost() {
+        assertThrows(IllegalArgumentException::class.java) {
+            OpenAiChatProvider(
+                "test-api-key-that-is-long-enough",
+                "test-model",
+                "https://attacker.example/v1/chat/completions"
+            )
+        }
+    }
+
 }
