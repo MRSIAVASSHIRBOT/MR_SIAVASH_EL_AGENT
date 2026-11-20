@@ -31,6 +31,10 @@ ALLOWED_ACTIONS = {"app.launch", "screen.capture"}
 ERROR_CODES = {"app_not_available", "permission_denied", "timeout", "execution_failed"}
 
 
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
 def _active_credentials() -> dict[str, Any] | None:
     credentials = load_credentials()
     if credentials is None:
@@ -83,7 +87,7 @@ def claim_one() -> dict[str, Any] | None:
         raise HubClientError("Hub returned an invalid task lease expiry.") from exc
     if lease_expiry.tzinfo is None or lease_expiry.utcoffset() is None:
         raise HubClientError("Hub task lease expiry must include a timezone.")
-    remaining = (lease_expiry - datetime.now(timezone.utc)).total_seconds()
+    remaining = (lease_expiry - _utc_now()).total_seconds()
     if not 0 < remaining <= MAX_TASK_LEASE_SECONDS:
         raise HubClientError("Hub task lease is expired or exceeds the supported bound.")
     return {
@@ -128,7 +132,7 @@ def execute_claimed(claimed: dict[str, Any]) -> dict[str, Any]:
         lease_expires_at = datetime.fromisoformat(lease_value.replace("Z", "+00:00"))
         if lease_expires_at.tzinfo is None or lease_expires_at.utcoffset() is None:
             raise ValueError("Task lease expiry must include a timezone.")
-        if not datetime.now(timezone.utc) < lease_expires_at:
+        if not _utc_now() < lease_expires_at:
             return {
                 "task_id": task_id,
                 "reported_status": "not_reported_lease_expired",
@@ -173,7 +177,7 @@ def execute_claimed(claimed: dict[str, Any]) -> dict[str, Any]:
     # An action may have taken effect even if it ran beyond its lease. Never
     # report a late success/failure or replay it; Hub will reconcile expiry as
     # unknown_outcome. This is safer than treating delivery as exactly-once.
-    if datetime.now(timezone.utc) >= lease_expires_at:
+    if _utc_now() >= lease_expires_at:
         return {
             "task_id": task_id,
             "reported_status": "not_reported_lease_expired",
