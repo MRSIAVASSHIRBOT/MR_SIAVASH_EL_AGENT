@@ -19,6 +19,7 @@ The provider order is deterministic. Only providers with a locally saved key are
 - The app does not upgrade provider plans, buy credits, or create billing resources.
 - API keys are stored in the existing Android Keystore AES-GCM encrypted payload. Keys are never written to source code or logs.
 - Only the typed planning request and fixed system prompt are sent. Files, microphone audio, screenshots, Hub credentials, and local memory are excluded.
+- When a provider fails, the same typed request may be sent to the next configured provider. Do not submit sensitive or confidential information.
 
 ## Failure handling
 
