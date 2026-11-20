@@ -2,11 +2,13 @@ package ir.mrsiavash.elagent
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.SystemClock
 import android.content.pm.PackageManager
 import android.os.Build
 import android.view.ViewGroup
@@ -32,6 +34,7 @@ class MainActivity : Activity() {
     private lateinit var pairingCode: EditText
     private lateinit var voiceController: LocalVoiceController
     private lateinit var voiceButton: Button
+    private lateinit var taskButton: Button
     private var voiceActive = false
     private val recordAudioRequest = 4102
 
@@ -105,6 +108,29 @@ class MainActivity : Activity() {
                 }
             }
         }, buttonParams())
+
+        taskButton = Button(this).apply {
+            text = "Check Hub tasks"
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(13, 33, 25))
+            setTextColor(Color.rgb(53, 214, 160))
+            setOnClickListener {
+                isEnabled = false
+                setBusy("Checking for an owner-authorized task…")
+                executor.execute {
+                    val result = runCatching { HubClient(store).claimTask() }
+                    runOnUiThread {
+                        taskButton.isEnabled = true
+                        result.onSuccess { claim ->
+                            if (claim == null) setStatus("No task is queued for this Android device or app.launch is not granted.")
+                            else showTaskApproval(claim)
+                        }.onFailure { error ->
+                            setStatus(error.message ?: "Could not check Hub tasks.")
+                        }
+                    }
+                }
+            }
+        }
+        root.addView(taskButton, buttonParams())
         voiceButton = Button(this).apply {
             text = "شروع فرمان صوتی (محلی)"
             backgroundTintList = ColorStateList.valueOf(Color.rgb(19, 185, 129))
@@ -149,6 +175,60 @@ class MainActivity : Activity() {
         }
     }
 
+
+
+    private fun showTaskApproval(claim: AndroidDeviceTaskClaim) {
+        val appName = claim.app ?: "unknown"
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Hub task requires your approval")
+            .setMessage(
+                "The Hub has requested to open '$appName' on this device. " +
+                "Nothing will happen unless you approve this request. " +
+                "The task expires after ${claim.timeoutSeconds} seconds."
+            )
+            .setPositiveButton("Approve and continue") { _, _ ->
+                val started = SystemClock.elapsedRealtime()
+                val launchResult = runCatching { launchAllowlisted(appName) }
+                val elapsed = SystemClock.elapsedRealtime() - started
+                if (launchResult.isSuccess) {
+                    setStatus("App launch requested. Reporting the outcome to Hub…")
+                    reportTaskOutcome(claim, true, null, elapsed)
+                } else {
+                    setStatus("This app is unavailable on Android. Reporting failure…")
+                    reportTaskOutcome(claim, false, "app_not_available", elapsed)
+                }
+            }
+            .setNegativeButton("Reject") { _, _ ->
+                setStatus("Task rejected. Reporting the decision to Hub…")
+                reportTaskOutcome(claim, false, "permission_denied", 0L)
+            }
+            .setOnCancelListener {
+                reportTaskOutcome(claim, false, "permission_denied", 0L)
+            }
+            .create()
+        dialog.show()
+    }
+
+    private fun reportTaskOutcome(
+        claim: AndroidDeviceTaskClaim,
+        succeeded: Boolean,
+        errorCode: String?,
+        durationMs: Long
+    ) {
+        executor.execute {
+            runCatching { HubClient(store).completeTask(claim, succeeded, errorCode, durationMs) }
+                .onSuccess {
+                    runOnUiThread {
+                        setStatus(if (succeeded) "Hub recorded the app-launch result (device-reported, not independently verified)." else "Hub recorded the rejected or failed task.")
+                    }
+                }
+                .onFailure { error ->
+                    runOnUiThread {
+                        setStatus("Could not report task outcome; Hub will expire the lease without replay: ${error.message}")
+                    }
+                }
+        }
+    }
 
     private fun toggleVoice() {
         if (voiceActive) {
