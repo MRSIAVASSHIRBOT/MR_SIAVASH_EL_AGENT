@@ -122,7 +122,7 @@ class MainActivity : Activity() {
                     runOnUiThread {
                         taskButton.isEnabled = true
                         result.onSuccess { claim ->
-                            if (claim == null) setStatus("No task is queued for this Android device or app.launch is not granted.")
+                            if (claim == null) setStatus("No supported task is queued, app.launch is not granted, or an unsupported task was safely reported as failed.")
                             else showTaskApproval(claim)
                         }.onFailure { error ->
                             setStatus(error.message ?: "Could not check Hub tasks.")
