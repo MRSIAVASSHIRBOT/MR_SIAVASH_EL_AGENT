@@ -140,7 +140,7 @@ class DesktopControlCenter:
         def worker():
             try:
                 result = _request("POST", "/v1/assistant/chat",
-                                  {"prompt": prompt, "mode": mode}, timeout=55)
+                                  {"prompt": prompt, "mode": mode}, timeout=240)
                 answer = result.get("content", "")
                 provider = result.get("provider", "unknown")
                 fallback = " · بازگشت به مدل محلی" if result.get("fallback_used") else ""
