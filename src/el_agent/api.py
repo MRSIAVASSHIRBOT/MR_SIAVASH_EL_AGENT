@@ -48,7 +48,7 @@ def create_app(*, token: str | None = None, store: TaskStore | None = None, scre
                     await task
                 except asyncio.CancelledError:
                     pass
-    app = FastAPI(title="MR_SIAVASH_EL_AGENT", version="0.1.0", description="Local Windows companion; loopback-only.")
+    app = FastAPI(title="MR_SIAVASH_EL_AGENT", version="0.2.0", description="Local Windows companion; loopback-only.")
     app.router.lifespan_context = lifespan
     async def auth(authorization: str | None = Header(default=None)) -> None:
         scheme, _, candidate = (authorization or "").partition(" ")
