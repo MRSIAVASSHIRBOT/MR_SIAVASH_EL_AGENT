@@ -8,12 +8,13 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID
 
 from el_agent.actions import capture_screenshot, launch_app
 from el_agent.hub import (
+    HEARTBEAT_REFRESH_WINDOW_SECONDS,
     HubClientError,
     _refresh_credentials,
     _request_json,
@@ -42,7 +43,7 @@ def _active_credentials() -> dict[str, Any] | None:
     from datetime import datetime, timezone
 
     expiry = datetime.fromisoformat(str(credentials["access_expires_at"]))
-    if expiry <= datetime.now(timezone.utc):
+    if expiry <= datetime.now(timezone.utc) + timedelta(seconds=HEARTBEAT_REFRESH_WINDOW_SECONDS):
         credentials = _refresh_credentials(credentials)
     return credentials
 
