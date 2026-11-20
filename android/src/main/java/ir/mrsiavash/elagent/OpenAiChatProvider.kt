@@ -134,7 +134,9 @@ class OpenAiChatProvider(
             if (choice.optString("finish_reason") == "length") {
                 throw IllegalStateException("Cloud response was truncated; reduce the request and try again.")
             }
-            val content = choice.optJSONObject("message")?.optString("content", null)
+            val message = choice.optJSONObject("message")
+                ?: throw IllegalStateException("Cloud provider returned no message object.")
+            val content = message.opt("content") as? String
             if (content.isNullOrBlank()) throw IllegalStateException("Cloud model returned no text.")
             return content.trim()
         }
