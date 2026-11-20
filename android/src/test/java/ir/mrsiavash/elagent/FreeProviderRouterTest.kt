@@ -86,8 +86,18 @@ class FreeProviderRouterTest {
     @Test fun freeProviderOrderIsExplicit() {
         assertEquals(
             listOf(FreeProviderId.GEMINI, FreeProviderId.GROQ, FreeProviderId.OPENROUTER),
-            listOf(FreeProviderId.GEMINI, FreeProviderId.GROQ, FreeProviderId.OPENROUTER)
+            FreeProviderPlanRouter.DEFAULT_PROVIDER_ORDER
         )
+    }
+
+    @Test fun routerFallsBackWhenFirstProviderReturnsInvalidPlanJson() {
+        val malformed = FakeProvider(FreeProviderId.GEMINI, result = """{"unexpected":true}""")
+        val valid = FakeProvider(FreeProviderId.GROQ, result = """{"schema_version":1,"summary":"ok","steps":[{"id":"open","operation":"open_app","depends_on":[],"target":"browser","text":null}],"clarification":null}""")
+        val result = FreeProviderPlanRouter(providersOverride = listOf(malformed, valid))
+            .generate(AgentPlanPrompt.SYSTEM_PROMPT, "open browser")
+        assertEquals(FreeProviderId.GROQ, result.provider)
+        assertEquals(1, malformed.calls)
+        assertEquals(1, valid.calls)
     }
 }
 
