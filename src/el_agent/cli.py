@@ -133,7 +133,7 @@ def main() -> None:
             "local_provider": "Ollama at 127.0.0.1:11434",
             "local_model": os.environ.get("EL_AGENT_OLLAMA_MODEL", "llama3.1:8b"),
             "cloud_provider": "OpenAI API",
-            "cloud_model_configured": bool(os.environ.get("EL_AGENT_CLOUD_MODEL")),
+            "cloud_model": os.environ.get("EL_AGENT_CLOUD_MODEL", "gpt-4o-mini"),
             "cloud_api_key_configured": cloud_key_configured(),
         }, ensure_ascii=False, indent=2))
         return
