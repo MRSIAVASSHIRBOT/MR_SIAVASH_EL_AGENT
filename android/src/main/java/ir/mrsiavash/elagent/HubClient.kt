@@ -8,6 +8,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.net.URI
+import java.time.Instant
 import java.util.concurrent.TimeUnit
 
 data class AndroidDeviceTaskClaim(
@@ -16,7 +17,8 @@ data class AndroidDeviceTaskClaim(
     val app: String?,
     val ownerConfirmed: Boolean,
     val timeoutSeconds: Long,
-    val leaseToken: String
+    val leaseToken: String,
+    val leaseExpiresAt: Instant
 )
 
 class HubClient(private val store: SecureStore) {
@@ -155,7 +157,10 @@ class HubClient(private val store: SecureStore) {
         val app = if (task.isNull("app")) null else task.optString("app")
         val timeout = task.optLong("timeout_seconds", -1)
         val lease = response.optString("lease_token")
-        require(taskId.isNotBlank() && action == "app.launch" && requiredScope == "app.launch") {
+        require(
+            runCatching { java.util.UUID.fromString(taskId).toString() == taskId }.getOrDefault(false) &&
+            action == "app.launch" && requiredScope == "app.launch"
+        ) {
             "Hub returned an unsupported Android task contract."
         }
         require(
@@ -164,11 +169,20 @@ class HubClient(private val store: SecureStore) {
         ) {
             "Task action is not supported by the Android companion."
         }
-        require(timeout in 5L..60L && lease.length in 40..128) {
-            "Hub returned an invalid task lease or timeout."
+        val leaseExpiresAt = runCatching { Instant.parse(response.optString("lease_expires_at")) }
+            .getOrElse { throw IllegalStateException("Hub returned an invalid lease expiry.", it) }
+        val remainingLeaseSeconds = leaseExpiresAt.epochSecond - Instant.now().epochSecond
+        require(
+            timeout in 5L..60L &&
+            lease.length in 40..128 &&
+            remainingLeaseSeconds in 1L..60L &&
+            app != null && app in setOf("chatgpt", "browser", "notepad", "calculator", "explorer")
+        ) {
+            "Hub returned an invalid task lease, timeout, or application alias."
         }
         return AndroidDeviceTaskClaim(
-            taskId, action, app, task.optBoolean("owner_confirmed", false), timeout, lease
+            taskId, action, app, task.optBoolean("owner_confirmed", false),
+            timeout, lease, leaseExpiresAt
         )
     }
 
@@ -188,8 +202,15 @@ class HubClient(private val store: SecureStore) {
             saved.getString("hub_url"), "/devices/tasks/${claim.taskId}/complete", payload,
             saved.getString("access_token"), saved.getString("device_id")
         )
-        require(response.optJSONObject("task") != null) {
-            "Hub did not confirm that the task outcome was recorded."
+        val reported = response.optJSONObject("task")
+            ?: throw IllegalStateException("Hub did not confirm that the task outcome was recorded.")
+        val expectedStatus = if (succeeded) "reported_succeeded" else "reported_failed"
+        require(
+            reported.optString("task_id") == claim.taskId &&
+            reported.optString("status") == expectedStatus &&
+            reported.optBoolean("outcome_verified", true) == false
+        ) {
+            "Hub returned an unexpected task outcome record."
         }
     }
 
