@@ -72,6 +72,22 @@ def load_credentials() -> dict[str, Any] | None:
     raise CredentialStoreError("File-backed credential storage must be handled by the non-Windows development adapter.")
 
 
+
+def has_credentials() -> bool:
+    """Check vault occupancy without decoding its value.
+
+    This lets an explicit unpair operation remove a corrupt credential record
+    without first needing to parse or trust its contents.
+    """
+    if platform.system() == "Windows":
+        keyring = _windows_keyring()
+        try:
+            return keyring.get_password(SERVICE_NAME, CREDENTIAL_USERNAME) is not None
+        except Exception as exc:
+            raise CredentialStoreError("Could not inspect Hub credentials in Windows Credential Manager.") from exc
+    raise CredentialStoreError("File-backed credential storage is handled by the non-Windows development adapter.")
+
+
 def delete_credentials() -> None:
     if platform.system() == "Windows":
         keyring = _windows_keyring()
