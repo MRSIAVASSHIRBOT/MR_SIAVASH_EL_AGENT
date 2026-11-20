@@ -151,6 +151,9 @@ class HubClient(private val store: SecureStore) {
             saved.getString("access_token"), saved.getString("device_id")
         )
         val task = response.optJSONObject("task") ?: return null
+        require(AndroidTaskPolicy.belongsToDevice(task.optString("device_id", null), saved.getString("device_id"))) {
+            "Hub returned a task for a different device identity."
+        }
         val taskId = task.optString("task_id")
         val action = task.optString("action")
         val requiredScope = task.optString("required_scope")
