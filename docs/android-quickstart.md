@@ -55,6 +55,20 @@ These are foreground, user-tapped actions. Android background activity-launch re
 
 Tap **انتخاب و پیش‌نمایش فایل متنی** and choose a document in Android's system picker. The app uses the Storage Access Framework; it does not request broad storage access. Only text and the supported structured-text MIME types are previewed. Reads are limited to 64 KiB and displayed output to 12,000 characters. Invalid UTF-8, binary content, PDF, and unsupported file types are rejected. Read access is persisted only when the document provider explicitly returns both read and persistable grants; otherwise the temporary picker grant is used for the current session. The contents remain on-device and are not included in cloud chat or Hub requests.
 
+## Online structured planner (Android 0.4.0)
+
+The Android app includes an explicit online plan-preview panel. Enter an OpenAI API key in the app and save it; it is encrypted in the existing Android Keystore-backed local payload. The default model identifier is `gpt-6.1-terra`, which can be changed to another model enabled for the API account.
+
+When **ساخت برنامهٔ اجرایی (بدون اجرا)** is tapped, only the text typed into the planner request field is sent to the fixed official OpenAI HTTPS Chat Completions endpoint. The app does not attach selected-file contents, microphone audio, screenshots, Hub credentials, or local memory to this request. API usage may incur charges separate from a ChatGPT subscription.
+
+The provider requests strict JSON Schema Structured Outputs. The app then independently validates the response and accepts at most eight ordered steps from this fixed operation set:
+- `open_app`: only the existing `chatgpt` and `browser` aliases
+- `open_url`: HTTPS only, without embedded credentials
+- `read_selected_document`: no path is accepted; a user must choose a document through Android's picker
+- `show_text`: bounded plain text
+
+Unknown fields, unsupported operations, invalid URLs, duplicate IDs, forward dependencies, excessive output, and malformed plans are rejected. The preview is not an execution engine: generation never launches an app, opens a URL, reads a file, or performs another device action. Execution adapters, a per-step review UI, and end-to-end physical-device acceptance remain future work.
+
 ## Disconnect
 Tap **Unpair locally** to erase the stored Hub credentials while preserving the installation's Device ID. Then revoke the device from the Hub owner device registry. Local unpairing alone does not revoke the server-side device record.
 
