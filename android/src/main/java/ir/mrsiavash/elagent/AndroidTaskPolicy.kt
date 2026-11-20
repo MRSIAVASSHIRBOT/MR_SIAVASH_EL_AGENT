@@ -10,6 +10,10 @@ internal object AndroidTaskPolicy {
     fun belongsToDevice(taskDeviceId: String?, localDeviceId: String): Boolean =
         taskDeviceId != null && taskDeviceId == localDeviceId
 
+    fun areSupportedScopes(grantedScopes: Set<String>): Boolean =
+        "device.heartbeat" in grantedScopes &&
+            grantedScopes.all { it == "device.heartbeat" || it == "app.launch" }
+
     fun canLaunch(
         action: String,
         requiredScope: String,
