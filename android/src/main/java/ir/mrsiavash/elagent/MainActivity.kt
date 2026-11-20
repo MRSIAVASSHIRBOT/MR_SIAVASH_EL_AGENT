@@ -143,6 +143,7 @@ class MainActivity : Activity() {
         }, buttonParams())
         status = TextView(this).apply { text = "Not connected"; textSize = 14f; setTextColor(Color.rgb(168, 196, 183)) }
         root.addView(status, fieldParams())
+        voiceController = LocalVoiceController(this, ::setStatus, ::handleVoiceTranscript, ::finishVoiceUi)
         if (HubClient(store).isPaired()) {
             setStatus("Paired with Hub. Periodic heartbeat is scheduled.")
             scheduleHeartbeat()
