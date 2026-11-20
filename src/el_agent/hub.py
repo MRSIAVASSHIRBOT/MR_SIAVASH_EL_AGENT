@@ -278,16 +278,23 @@ def load_credentials() -> dict[str, object] | None:
     return _validate_credential_record(result)
 
 
-def _delete_credentials() -> None:
+def _delete_credentials() -> bool:
+    """Remove both OS-vault and legacy credentials after a user-requested unpair."""
+    was_present = False
     if platform.system() == "Windows":
-        from el_agent.credential_store import delete_credentials
+        from el_agent.credential_store import delete_credentials, has_credentials
         try:
+            was_present = has_credentials()
             delete_credentials()
         except Exception as exc:
+            # Do not remove a legacy recovery copy if Vault inspection/removal
+            # failed. The caller must be told that unpair did not complete.
             raise HubClientError("Could not remove Hub credentials from Windows Credential Manager.") from exc
     path = credentials_path()
     if path.exists():
         path.unlink()
+        was_present = True
+    return was_present
 
 def pair_device(hub_url: str, pairing_code: str) -> dict[str, object]:
     base_url = validate_hub_url(hub_url)
@@ -395,14 +402,16 @@ def hub_status() -> dict[str, object]:
 
 
 def unpair_local() -> dict[str, object]:
-    credentials = load_credentials()
-    path = credentials_path()
-    if path.exists():
-        path.unlink()
+    # Unpair is an explicit local credential-removal action. Do not require
+    # credential JSON to parse first: a corrupt Vault value must still be
+    # removable, while a Vault access/delete failure must fail closed.
+    identity_path = device_id_path()
+    device_id = identity_path.read_text(encoding="utf-8").strip() if identity_path.exists() else None
+    was_paired = _delete_credentials()
     return {
         "paired": False,
-        "device_id": credentials["device_id"] if credentials else (device_id_path().read_text(encoding="utf-8").strip() if device_id_path().exists() else None),
-        "remote_revocation_required": credentials is not None,
+        "device_id": device_id,
+        "remote_revocation_required": was_paired,
     }
 
 
