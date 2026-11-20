@@ -121,7 +121,7 @@ class FreeProviderRouterTest {
     @Test fun parsesJsonInsideMarkdownFenceFromFreeModel() {
         val planJson = """{"schema_version":1,"summary":"ok","steps":[{"id":"open","operation":"open_app","depends_on":[],"target":"browser","text":null}],"clarification":null}"""
         val fence = 96.toChar().toString().repeat(3)
-        val content = fence + "json\\n" + planJson + "\\n" + fence
+        val content = fence + "json" + 10.toChar() + planJson + 10.toChar() + fence
         val response = org.json.JSONObject()
             .put("choices", org.json.JSONArray().put(
                 org.json.JSONObject().put("finish_reason", "stop")
@@ -135,7 +135,7 @@ class FreeProviderRouterTest {
         val response = org.json.JSONObject()
             .put("choices", org.json.JSONArray().put(
                 org.json.JSONObject().put("finish_reason", "stop")
-                    .put("message", org.json.JSONObject().put("content", "Here is the plan:\\n" + planJson))
+                    .put("message", org.json.JSONObject().put("content", "Here is the plan:" + 10.toChar() + planJson))
             )).toString()
         assertEquals(planJson, ProviderHttp.parseChatCompletion(FreeProviderId.OPENROUTER, response))
     }
