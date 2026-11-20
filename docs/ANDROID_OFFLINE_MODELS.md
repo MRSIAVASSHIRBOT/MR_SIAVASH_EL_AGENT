@@ -5,6 +5,7 @@
 The Android companion currently has platform on-device speech recognition where the device exposes a compatible recognizer. This is not a bundled Persian STT engine, and the Android app does not yet run a local generative LLM.
 
 This increment adds:
+- A Dark Emerald Android screen reachable from Tools → Offline model management, with one import action per catalog entry and a stored-model status view.
 - A bounded catalog for multilingual Whisper Tiny/Base and a small Persian-tuned Qwen GGUF candidate.
 - Owner-initiated import from Android's system file picker into app-private storage.
 - File-size and container-magic validation.
@@ -40,6 +41,17 @@ The catalog accepts a conservative file-size range and checks the expected conta
 - STT and LLM should initially run sequentially, not concurrently, to reduce memory pressure.
 - Start with a short LLM context window and measure actual peak memory, latency, thermal behavior, and Persian quality on the physical device.
 - Model import does not grant permission to use the microphone. Voice capture remains foreground and user initiated.
+
+## Owner workflow
+
+1. Open the Android app and select **Tools**.
+2. Open **مدیریت مدل‌های آفلاین · Whisper و LLM**.
+3. Obtain the exact model file from the HTTPS source listed beside the model. Keep the expected filename unchanged.
+4. Tap the corresponding import button and choose the file using Android's system document picker.
+5. The app copies the file into app-private storage and checks its size and container header. The original file is not deleted.
+6. Reopen the screen or tap **بازبینی وضعیت مدل‌ها** to view stored model status.
+
+A successful import means **stored**, not **running**. There is intentionally no inference button until the native runtime is integrated and tested.
 
 ## Next engineering gates
 
