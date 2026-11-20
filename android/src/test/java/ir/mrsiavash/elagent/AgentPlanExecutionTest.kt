@@ -67,6 +67,12 @@ class AgentPlanExecutionTest {
         assertTrue(session.isComplete())
     }
 
+    @Test fun pendingLaterTextStepCannotBeCompletedOutOfOrder() {
+        val session = AgentPlanExecutionSession(twoStepPlan(), "session-0001")
+        assertThrows(IllegalArgumentException::class.java) { session.markCompleted("display") }
+        assertEquals(PlanStepState.PENDING, session.record("display").state)
+    }
+
     @Test fun cannotMarkExternalActionCompleteWithoutOwnerVerification() {
         val session = AgentPlanExecutionSession(twoStepPlan(), "session-0001")
         session.markDispatched("open")
@@ -103,16 +109,15 @@ class AgentPlanExecutionTest {
         assertTrue(readSelected.allowed)
     }
 
-    @Test fun policyCannotAuthorizeBlockedCapabilities() {
-        val blocked = AgentPlanStep(
-            id = "unsupported",
-            operation = AgentOperation.SHOW_TEXT,
-            dependsOn = emptyList(),
-            text = "test"
+    @Test fun displayStepStillRequiresForegroundOwnerInitiation() {
+        val display = step("show", AgentOperation.SHOW_TEXT, text = "hello")
+        val denied = AgentPlanExecutionPolicy.evaluate(
+            display, PlanPolicyContext("session:show", true, false)
         )
-        val decision = AgentPlanExecutionPolicy.evaluate(
-            blocked, PlanPolicyContext("session:unsupported", true, true)
+        val allowed = AgentPlanExecutionPolicy.evaluate(
+            display, PlanPolicyContext("session:show", true, true)
         )
-        assertTrue(decision.allowed)
+        assertFalse(denied.allowed)
+        assertTrue(allowed.allowed)
     }
 }
