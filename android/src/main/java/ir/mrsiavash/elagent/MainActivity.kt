@@ -418,6 +418,7 @@ class MainActivity : Activity() {
             backgroundTintList = ColorStateList.valueOf(Color.rgb(69, 38, 48))
             setTextColor(Color.rgb(255, 224, 231))
             setOnClickListener { view ->
+                HubCredentialLock.requestUnpair()
                 val unpairButton = view as Button
                 unpairButton.isEnabled = false
                 setBusy("Unpairing from Hub on this device…")
@@ -900,7 +901,7 @@ class MainActivity : Activity() {
                 }
                 val started = SystemClock.elapsedRealtime()
                 val launchResult = runCatching {
-                    HubCredentialLock.withLock {
+                    HubCredentialLock.withDeviceAction {
                         check(HubClient(store).isPaired()) {
                             "Device was unpaired before task execution; no app was opened."
                         }
