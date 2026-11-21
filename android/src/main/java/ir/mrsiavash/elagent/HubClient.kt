@@ -188,6 +188,9 @@ class HubClient(private val store: SecureStore) {
         errorCode: String?,
         durationMs: Long
     ) {
+        require(AndroidTaskPolicy.isWithinExecutionDeadline(durationMs, claim.timeoutSeconds)) {
+            "Hub task execution deadline exceeded; outcome remains unknown and must not be reported."
+        }
         require(Instant.now().isBefore(claim.leaseExpiresAt)) {
             "Hub task lease expired before the outcome could be reported."
         }
