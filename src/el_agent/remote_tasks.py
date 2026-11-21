@@ -227,8 +227,14 @@ def execute_claimed(claimed: dict[str, Any]) -> dict[str, Any]:
         payload["error_code"] = error_code
     reported = _post(credentials, f"/devices/tasks/{task_id}/complete", payload)
     reported_task = reported.get("task")
-    if not isinstance(reported_task, dict):
-        raise HubClientError("Hub did not confirm that the device outcome was recorded.")
+    expected_status = "reported_succeeded" if outcome == "succeeded" else "reported_failed"
+    if (
+        not isinstance(reported_task, dict)
+        or reported_task.get("task_id") != task_id
+        or reported_task.get("status") != expected_status
+        or reported_task.get("outcome_verified") is not False
+    ):
+        raise HubClientError("Hub returned an unexpected device task outcome record.")
     return {
         "task_id": task_id,
         "reported_status": reported_task.get("status"),
