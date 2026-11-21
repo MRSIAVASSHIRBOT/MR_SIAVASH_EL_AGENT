@@ -200,6 +200,25 @@ def test_action_finishing_after_lease_expiry_is_not_reported_or_replayed(monkeyp
 
 
 
+def test_action_exceeding_timeout_is_not_reported_or_replayed(monkeypatch):
+    claimed = _claimed()
+    launched = []
+    clock = iter([0.0, 16.0])
+    monkeypatch.setattr(remote_tasks.time, "monotonic", lambda: next(clock))
+    monkeypatch.setattr(remote_tasks, "launch_app", lambda alias: launched.append(alias))
+    monkeypatch.setattr(
+        remote_tasks, "_post",
+        lambda *_args, **_kwargs: pytest.fail("timed-out task outcome must not be reported"),
+    )
+
+    result = remote_tasks.execute_claimed(claimed)
+
+    assert launched == ["notepad"]
+    assert result["reported_status"] == "not_reported_timeout"
+    assert result["outcome_verified"] is None
+    assert result["action_attempted"] is True
+
+
 def test_task_for_different_device_is_rejected_before_action(monkeypatch):
     claimed = _claimed()
     claimed["task"]["device_id"] = "00000000-0000-0000-0000-000000000099"
