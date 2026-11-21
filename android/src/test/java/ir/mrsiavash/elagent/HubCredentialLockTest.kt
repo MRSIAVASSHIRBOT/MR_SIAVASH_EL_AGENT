@@ -45,4 +45,13 @@ class HubCredentialLockTest {
         assertTrue("A worker failed: $failures", failures.isEmpty())
         assertEquals("Credential critical sections must never overlap.", 1, maximumConcurrent.get())
     }
+    @Test
+    fun nestedCredentialOperationsCanReuseTheSameLock() {
+        val result = HubCredentialLock.withLock {
+            HubCredentialLock.withLock { "nested-credential-operation" }
+        }
+
+        assertEquals("nested-credential-operation", result)
+    }
+
 }
