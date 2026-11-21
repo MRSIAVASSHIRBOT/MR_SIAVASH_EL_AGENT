@@ -968,7 +968,7 @@ class MainActivity : Activity() {
             val granted = grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED
             val shouldCall = pendingCallAfterPermission
             pendingCallAfterPermission = false
-            if (granted && shouldCall) placeFatherCall()
+            if (granted && shouldCall) executeFatherCall()
             else if (!granted) {
                 setStatus("مجوز تماس تلفنی صادر نشد؛ هیچ تماسی برقرار نشد.")
                 voiceController.speak("مجوز تماس تلفنی صادر نشد.")
@@ -1041,7 +1041,7 @@ class MainActivity : Activity() {
         }
     }
 
-    /** Places a call immediately after the explicit voice command and Android permission grant. */
+    /** A voice command opens a confirmation dialog; it never places a call by itself. */
     private fun placeFatherCall() {
         val number = store.fatherContactPhone()
         if (number.isBlank()) {
@@ -1050,10 +1050,28 @@ class MainActivity : Activity() {
             chooseFatherContact(forImmediateCall = true)
             return
         }
+        val contactName = store.fatherContactName().ifBlank { "پدر" }
+        AlertDialog.Builder(this)
+            .setTitle("تأیید تماس")
+            .setMessage("آیا می‌خواهی همین حالا با $contactName تماس بگیری؟")
+            .setNegativeButton("انصراف", null)
+            .setPositiveButton("تماس") { _, _ -> requestCallPermissionAndPlace(number) }
+            .show()
+    }
+
+    private fun requestCallPermissionAndPlace(number: String) {
         if (checkSelfPermission(Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
             pendingCallAfterPermission = true
             requestPermissions(arrayOf(Manifest.permission.CALL_PHONE), callPhoneRequest)
-            setStatus("برای تماس مستقیم، مجوز تماس Android لازم است.")
+            setStatus("پس از تأیید مجوز Android، تماس برقرار می‌شود.")
+            return
+        }
+        executeFatherCall(number)
+    }
+
+    private fun executeFatherCall(number: String = store.fatherContactPhone()) {
+        if (number.isBlank()) {
+            setStatus("شمارهٔ مخاطب در دسترس نیست؛ تماسی برقرار نشد.")
             return
         }
         runCatching {
