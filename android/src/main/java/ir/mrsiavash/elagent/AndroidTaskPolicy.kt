@@ -26,6 +26,9 @@ internal object AndroidTaskPolicy {
         app != null &&
         app in supportedAppAliases
 
+    fun isWithinExecutionDeadline(durationMs: Long, timeoutSeconds: Long): Boolean =
+        timeoutSeconds in 5L..60L && durationMs in 0L..(timeoutSeconds * 1000L)
+
     fun denialCode(requiredScope: String, grantedScopes: Set<String>): String =
         if (requiredScope !in setOf("app.launch", "screen.capture") || requiredScope !in grantedScopes) {
             "permission_denied"
