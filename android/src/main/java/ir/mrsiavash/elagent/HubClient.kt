@@ -8,7 +8,18 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.net.URI
+import java.time.Instant
 import java.util.concurrent.TimeUnit
+
+data class AndroidDeviceTaskClaim(
+    val taskId: String,
+    val action: String,
+    val app: String?,
+    val ownerConfirmed: Boolean,
+    val timeoutSeconds: Long,
+    val leaseToken: String,
+    val leaseExpiresAt: Instant
+)
 
 class HubClient(private val store: SecureStore) {
     private val http = OkHttpClient.Builder()
@@ -70,8 +81,9 @@ class HubClient(private val store: SecureStore) {
             "Hub returned invalid credential lifetimes."
         }
         val scopes = result.optJSONArray("scopes") ?: throw IllegalStateException("Hub omitted granted scopes.")
-        require(scopes.length() == 1 && scopes.optString(0) == "device.heartbeat") {
-            "This Android preview accepts only the device.heartbeat scope. Create a new pairing challenge with that single scope."
+        val grantedScopes = (0 until scopes.length()).map { scopes.optString(it) }.toSet()
+        require(AndroidTaskPolicy.areSupportedScopes(grantedScopes)) {
+            "Android supports only device.heartbeat and app.launch scopes in this preview."
         }
         val now = System.currentTimeMillis()
         val saved = store.read()
@@ -83,7 +95,7 @@ class HubClient(private val store: SecureStore) {
             .put("refresh_expires_at", now + refreshTtl * 1000L)
             .put("scopes", scopes)
         store.write(saved)
-        return "Paired successfully. Granted scopes: device.heartbeat"
+        return "Paired successfully. Granted scopes: ${grantedScopes.sorted().joinToString()}"
     }
 
     fun refreshIfNeeded(): JSONObject = synchronized(credentialLock) {
@@ -114,6 +126,93 @@ class HubClient(private val store: SecureStore) {
                 .put("refresh_expires_at", System.currentTimeMillis() + refreshTtl * 1000L)
             store.write(saved)
             saved
+        }
+    }
+
+    fun claimTask(): AndroidDeviceTaskClaim? {
+        val saved = refreshIfNeeded()
+        val scopes = saved.optJSONArray("scopes") ?: return null
+        val grantedScopes = (0 until scopes.length()).map { scopes.optString(it) }.toSet()
+        if ("app.launch" !in grantedScopes) return null
+
+        val response = request(
+            saved.getString("hub_url"), "/devices/tasks/claim", JSONObject(),
+            saved.getString("access_token"), saved.getString("device_id")
+        )
+        val task = response.optJSONObject("task") ?: return null
+        require(AndroidTaskPolicy.belongsToDevice(task.optString("device_id", null), saved.getString("device_id"))) {
+            "Hub returned a task for a different device identity."
+        }
+        val taskId = task.optString("task_id")
+        val action = task.optString("action")
+        val requiredScope = task.optString("required_scope")
+        val app = if (task.isNull("app")) null else task.optString("app")
+        val timeout = task.optLong("timeout_seconds", -1)
+        val lease = response.optString("lease_token")
+
+        require(runCatching { java.util.UUID.fromString(taskId).toString() == taskId }.getOrDefault(false)) {
+            "Hub returned a non-canonical Android task identifier."
+        }
+        require(requiredScope.isNotBlank()) { "Hub omitted the task's required scope." }
+
+        val leaseExpiresAt = runCatching { Instant.parse(response.optString("lease_expires_at")) }
+            .getOrElse { throw IllegalStateException("Hub returned an invalid lease expiry.", it) }
+        val remainingLeaseSeconds = leaseExpiresAt.epochSecond - Instant.now().epochSecond
+        require(
+            timeout in 5L..60L &&
+            lease.length in 40..128 &&
+            remainingLeaseSeconds in 1L..60L
+        ) {
+            "Hub returned an invalid task lease or timeout."
+        }
+
+        val claim = AndroidDeviceTaskClaim(
+            taskId, action, app, task.optBoolean("owner_confirmed", false),
+            timeout, lease, leaseExpiresAt
+        )
+        if (!AndroidTaskPolicy.canLaunch(action, requiredScope, app, grantedScopes)) {
+            completeTask(
+                claim,
+                succeeded = false,
+                errorCode = AndroidTaskPolicy.denialCode(requiredScope, grantedScopes),
+                durationMs = 0L
+            )
+            return null
+        }
+        return claim
+    }
+
+    fun completeTask(
+        claim: AndroidDeviceTaskClaim,
+        succeeded: Boolean,
+        errorCode: String?,
+        durationMs: Long
+    ) {
+        require(AndroidTaskPolicy.isWithinExecutionDeadline(durationMs, claim.timeoutSeconds)) {
+            "Hub task execution deadline exceeded; outcome remains unknown and must not be reported."
+        }
+        require(Instant.now().isBefore(claim.leaseExpiresAt)) {
+            "Hub task lease expired before the outcome could be reported."
+        }
+        val saved = refreshIfNeeded()
+        val payload = JSONObject()
+            .put("lease_token", claim.leaseToken)
+            .put("outcome", if (succeeded) "succeeded" else "failed")
+            .put("duration_ms", durationMs.coerceIn(0L, 60_000L))
+        if (!succeeded) payload.put("error_code", errorCode ?: "execution_failed")
+        val response = request(
+            saved.getString("hub_url"), "/devices/tasks/${claim.taskId}/complete", payload,
+            saved.getString("access_token"), saved.getString("device_id")
+        )
+        val reported = response.optJSONObject("task")
+            ?: throw IllegalStateException("Hub did not confirm that the task outcome was recorded.")
+        val expectedStatus = if (succeeded) "reported_succeeded" else "reported_failed"
+        require(
+            reported.optString("task_id") == claim.taskId &&
+            reported.optString("status") == expectedStatus &&
+            reported.optBoolean("outcome_verified", true) == false
+        ) {
+            "Hub returned an unexpected task outcome record."
         }
     }
 

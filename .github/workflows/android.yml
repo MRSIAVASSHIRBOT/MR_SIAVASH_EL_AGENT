@@ -1,7 +1,7 @@
 name: Android
 on:
   push:
-    branches: [main, "feat/**"]
+    branches: [main]
     paths:
       - "android/**"
       - "*.gradle.kts"
@@ -21,7 +21,7 @@ on:
       - ".github/workflows/android.yml"
   workflow_dispatch:
 concurrency:
-  group: android-${{ github.workflow }}-${{ github.ref }}
+  group: android-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 permissions:
   contents: read
@@ -34,17 +34,17 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - name: Install Android SDK packages from runner SDK
+      - name: Install Android SDK, NDK, and CMake
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
           ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
         run: |
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
-      - name: Build Android debug APK
+      - name: Build Android debug APK and run unit tests
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
           ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
