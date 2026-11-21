@@ -416,7 +416,7 @@ class MainActivity : Activity() {
             backgroundTintList = ColorStateList.valueOf(Color.rgb(69, 38, 48))
             setTextColor(Color.rgb(255, 224, 231))
             setOnClickListener {
-                store.clearCredentialsPreservingIdentity()
+                HubClient(store).unpairLocally()
                 WorkManager.getInstance(this@MainActivity).cancelUniqueWork("el-agent-heartbeat")
                 setStatus("Local credentials cleared. Revoke the device in Hub to fully disconnect.")
             }
