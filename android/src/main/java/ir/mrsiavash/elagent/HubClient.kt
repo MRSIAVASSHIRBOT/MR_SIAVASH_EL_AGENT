@@ -296,5 +296,7 @@ class HubClient(private val store: SecureStore) {
         "Hub heartbeat: ${response.optString("status", "unknown")}"
     }
 
-    fun isPaired(): Boolean = HubCredentialLock.withLock { store.read().has("refresh_token") }
+    fun isPaired(): Boolean = HubCredentialLock.withLock {
+        !HubCredentialLock.isUnpairRequested() && store.read().has("refresh_token")
+    }
 }
