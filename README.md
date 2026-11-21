@@ -16,7 +16,7 @@ A device-side companion for the MR_SIAVASH ecosystem. Windows provides the local
 - A deterministic Persian/English command parser for a small allowlist (e.g. «اسکرین‌شات بگیر» and «برو داخل چت جی پی تی»); unknown commands are rejected.
 - CLI commands so everyday use does not require Swagger or custom scripts.
 
-MR_SIAVASH_HUB_AI is the authority for device identity, scoped credentials, registry, revocation, and device health. The companion currently sends outbound heartbeat metadata only; Hub-issued remote task dispatch and shared memory are not enabled yet.
+MR_SIAVASH_HUB_AI is the authority for device identity, scoped credentials, registry, revocation, and device health. Windows Hub task consumption is implemented in draft PR #23; Android foreground-only app.launch consumption is implemented in draft PR #24. Neither is merged or live-device accepted yet. Shared memory is not enabled.
 
 ## Android companion
 
@@ -141,7 +141,7 @@ This startup option runs the loopback-only API in the background; it does not en
 
 ## Security boundaries
 
-- The local API is loopback-only; no inbound remote-control transport or remote task dispatch is implemented. Optional outbound Hub heartbeat is limited to minimal device health metadata.
+- The local API is loopback-only; no inbound remote-control transport is exposed. Optional Hub task consumption is outbound-only and remains owner-scoped, capability-limited, and separately gated by Hub deployment and device acceptance.
 - Every control endpoint requires bearer authentication.
 - Screenshot capture is explicit and files remain on the local device.
 - Application launch is restricted to fixed aliases; no arbitrary shell, script, executable path, arguments, or caller-supplied URL is executed.
@@ -178,4 +178,4 @@ See docs/ROADMAP.md and docs/SECURITY.md. CI tests Windows and Linux with Python
 
 ## Status
 
-Windows version 0.2.0 provides owner-initiated Hub pairing, rotating scoped device credentials, and outbound heartbeat. Android companion preview 0.5.0 adds native pairing, encrypted credential storage, periodic heartbeat, and explicit local app launch. A clean Windows 11 installation and live screenshot/application-launch acceptance test are still required before calling desktop behavior verified. The scheduled ChatGPT shortcut opens ChatGPT only; sending prompts or automating a conversation is not implemented. Remote task dispatch, shared memory, browser extension, and cloud scheduling remain planned.
+Windows version 0.2.0 provides owner-initiated Hub pairing, rotating scoped device credentials, and outbound heartbeat. Android companion preview 0.5.0 adds native pairing, encrypted credential storage, periodic heartbeat, and explicit local app launch. A clean Windows 11 installation and live screenshot/application-launch acceptance test are still required before calling desktop behavior verified. The scheduled ChatGPT shortcut opens ChatGPT only; sending prompts or automating a conversation is not implemented. Windows and Android remote task consumers are implemented in draft PRs and await merge, Hub deployment, and physical-device acceptance. Shared memory, browser extension, and cloud scheduling remain planned.
