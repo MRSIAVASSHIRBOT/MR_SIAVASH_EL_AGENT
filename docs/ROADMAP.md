@@ -8,6 +8,8 @@
 - [x] SQLite-backed scheduled app launch, task listing, and cancellation
 - [x] Restart recovery fences interrupted launches as unknown_outcome without replay
 - [x] Pending tasks more than 24 hours overdue are marked missed; recent due tasks remain eligible
+- [x] Windows local-first text provider core: Ollama local mode, explicit online/hybrid modes, bounded requests, and OS credential-store-backed API key handling
+- [ ] Windows 11 acceptance for Ollama latency and native credential-store behavior
 - [x] Windows and Linux CI pass on Python 3.11 and 3.12
 - [ ] Clean Windows 11 installation and live acceptance test
 - [x] Friendly desktop control center with task management and ISO-8601 scheduling
@@ -19,11 +21,16 @@
 - [x] Owner-initiated single-use device pairing
 - [x] Short-lived scoped credentials, device registry, and revocation
 - [x] Outbound heartbeat and Hub audit correlation
-- [ ] Hub-issued task dispatch with expiry, idempotency, cancellation, and verified outcomes
+- [x] Windows Hub task consumer for allowlisted app.launch and explicitly owner-confirmed screen.capture (consumer tests added; live acceptance pending Hub deployment)
+- [x] Windows Credential Manager storage with fail-closed backend validation and one-time legacy JSON migration
+- [ ] Live Hub pairing with action scopes, task round-trip, and revocation acceptance
+- [ ] Hub-issued task dispatch live acceptance with expiry, idempotency, cancellation, and outcome reconciliation
 - [ ] Shared memory through Hub APIs only
 
 ## Platform expansion
-- [x] Android native companion preview: Kotlin app, Keystore-backed credentials, owner pairing, heartbeat, and allowlisted app launch (Android CI passed; physical-device acceptance pending)
+- [x] Android native companion preview: Kotlin app, Keystore-backed credentials, owner pairing, heartbeat, and allowlisted app launch
+- [ ] Android foreground Hub task claiming with explicit on-device approval, ChatGPT/browser-only alias policy, exact device/scope binding, lease-deadline checks, and bounded outcome reporting
+- [ ] Android background task scheduling, notification-based approvals, and screenshot support (separate permission/security review)
 - [ ] Browser extension with explicit host permissions
 - [ ] Cloud scheduling and online-device coordination
 ## Voice intelligence
@@ -38,12 +45,23 @@
 - [ ] Owner-approved preference and procedural memory
 - [ ] Bounded multi-step planning
 - [ ] Self-evaluation and safe recovery
-- [x] Windows local-first text provider core: Ollama local mode, explicit online/hybrid modes, bounded requests, and OS credential-store-backed API key handling.
-- [ ] Windows 11 acceptance for Ollama latency and native credential-store behavior.
 - [ ] Cross-device orchestration
 
 No item is complete until code, tests, privacy review, and platform acceptance evidence exist.
 
+
+## Six-phase roadmap alignment — 2026-11-20
+
+| Phase | Current evidence | Remaining acceptance gate |
+|---|---|---|
+| 1. Core integration | Hub pairing, stable device identity, heartbeat, owner-scoped task contract on Hub PR #460, scoped consumer client on this branch | Deploy merged Hub task API; live owner pairing with least-privilege scopes; verify revocation and task audit |
+| 2. Windows Agent | Loopback API, bearer auth, explicit screenshot, allowlisted app launch, desktop UI, local scheduler, Hub task consumer implementation | Clean Windows 11 install, real screenshot/app launch, remote task round-trip and recovery on the owner's machine |
+| 3. Autonomous Scheduler | Durable local scheduler, restart recovery, uncertain-outcome fencing, and 24-hour missed-deadline classification; Hub-side scheduled queue contract | Physical Windows 11 restart/offline acceptance and a live Hub task scheduling/expiry round-trip |
+| 4. Android & Browser | Android pairing, encrypted Keystore credentials, heartbeat, and local voice; remote task consumer remains separate | Physical Android acceptance; background task scheduling, screenshot capture, and browser extension remain unimplemented |
+| 5. Digital Representative | Deterministic Persian/English intents and local voice command routing | Owner-approved preference memory, bounded planning, multi-mission state and evidence-based self-evaluation |
+| 6. Ecosystem Integration | Hub and website public Gateway contracts exist; three repositories remain separated by explicit trust boundaries | Dashboard device/task views, controlled cross-project memory API, multi-device orchestration and end-to-end acceptance |
+
+Phase completion is evidence-gated. GitHub CI does not substitute for physical Windows/Android acceptance, live Hub deployment, or production integration. No live device operation or production deployment is claimed by this source change.
 
 ## Scheduler recovery acceptance
 
@@ -51,3 +69,4 @@ No item is complete until code, tests, privacy review, and platform acceptance e
 - [x] Scheduler startup reconciles interrupted rows before claiming new work.
 - [x] The local scheduler runs app-launch work off the event loop and leaves interrupted executions unreplayed.
 - [ ] Physical Windows 11 restart/offline acceptance remains pending.
+

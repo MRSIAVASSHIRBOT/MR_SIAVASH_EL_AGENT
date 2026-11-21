@@ -132,7 +132,8 @@ def _validated_tokens(result: dict[str, object]) -> dict[str, object]:
         or not isinstance(access_ttl, int) or not 30 <= access_ttl <= 3600
         or not isinstance(refresh_ttl, int) or not 3600 <= refresh_ttl <= 90 * 24 * 3600
         or not isinstance(scopes, list) or not all(isinstance(scope, str) for scope in scopes)
-        or set(scopes) != {"device.heartbeat"}
+        or not {"device.heartbeat"}.issubset(set(scopes))
+        or not set(scopes).issubset({"device.heartbeat", "app.launch", "screen.capture"})
     ):
         raise HubClientError("Hub returned invalid device credentials.")
     now = datetime.now(timezone.utc)
@@ -146,6 +147,31 @@ def _validated_tokens(result: dict[str, object]) -> dict[str, object]:
 
 
 def _save_credentials(credentials: dict[str, object]) -> None:
+    if platform.system() == "Windows":
+        from el_agent.credential_store import load_credentials as load_vault_credentials
+        from el_agent.credential_store import save_credentials
+        try:
+            save_credentials(credentials)
+            stored = load_vault_credentials()
+            if stored != credentials:
+                raise HubClientError("Windows Credential Manager did not preserve the credential record.")
+            legacy_path = credentials_path()
+            if legacy_path.exists():
+                legacy = json.loads(legacy_path.read_text(encoding="utf-8"))
+                if not isinstance(legacy, dict):
+                    raise HubClientError("Legacy Hub credential file has an invalid shape; it was preserved.")
+                _validate_credential_record(legacy)
+                if (
+                    legacy.get("device_id") != credentials.get("device_id")
+                    or legacy.get("hub_url") != credentials.get("hub_url")
+                ):
+                    raise HubClientError("Legacy credentials belong to a different device or Hub; manual review is required.")
+                legacy_path.unlink()
+        except HubClientError:
+            raise
+        except Exception as exc:
+            raise HubClientError("Hub credentials could not be verified in Windows Credential Manager or legacy plaintext credentials could not be safely reconciled.") from exc
+        return
     path = credentials_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, temporary_name = tempfile.mkstemp(prefix="hub-credentials-", suffix=".tmp", dir=path.parent)
@@ -164,7 +190,88 @@ def _save_credentials(credentials: dict[str, object]) -> None:
             os.unlink(temporary_name)
 
 
-def load_credentials() -> dict[str, object] | None:
+def _validate_credential_record(result: dict[str, object]) -> dict[str, object]:
+    """Validate the complete record before returning or migrating it."""
+    required = {
+        "hub_url", "device_id", "access_token", "refresh_token",
+        "access_expires_at", "refresh_expires_at", "scopes",
+    }
+    if not required.issubset(result):
+        raise HubClientError("Local Hub credentials are incomplete.")
+    try:
+        hub_url = result["hub_url"]
+        if not isinstance(hub_url, str) or validate_hub_url(hub_url) != hub_url:
+            raise ValueError("Hub URL is not canonical.")
+        device_id = result["device_id"]
+        canonical_device_id = str(UUID(str(device_id)))
+        if canonical_device_id != device_id:
+            raise ValueError("Device identity is not canonical.")
+        identity_path = device_id_path()
+        if not identity_path.is_file() or identity_path.read_text(encoding="utf-8").strip() != canonical_device_id:
+            raise ValueError("Stored device identity does not match this installation.")
+        for key in ("access_token", "refresh_token"):
+            token = result[key]
+            if not isinstance(token, str) or not 40 <= len(token) <= 256:
+                raise ValueError(f"{key} is invalid.")
+        scopes = result["scopes"]
+        allowed_scopes = {"device.heartbeat", "app.launch", "screen.capture"}
+        if (
+            not isinstance(scopes, list)
+            or not all(isinstance(scope, str) for scope in scopes)
+            or len(scopes) != len(set(scopes))
+            or "device.heartbeat" not in scopes
+            or not set(scopes).issubset(allowed_scopes)
+        ):
+            raise ValueError("Stored device scopes are invalid.")
+        for key in ("access_expires_at", "refresh_expires_at"):
+            expiry = datetime.fromisoformat(str(result[key]))
+            if expiry.tzinfo is None or expiry.utcoffset() is None:
+                raise ValueError("Credential expiry timestamps must be timezone-aware.")
+    except (ValueError, OSError, TypeError) as exc:
+        raise HubClientError("Local Hub credentials failed validation; no network request was sent.") from exc
+    return result
+
+
+def _read_credentials_raw() -> dict[str, object] | None:
+    if platform.system() == "Windows":
+        from el_agent.credential_store import load_credentials, save_credentials
+        try:
+            stored = load_credentials()
+            legacy_path = credentials_path()
+            if stored is not None:
+                _validate_credential_record(stored)
+                if legacy_path.exists():
+                    legacy = json.loads(legacy_path.read_text(encoding="utf-8"))
+                    if not isinstance(legacy, dict):
+                        raise HubClientError("Legacy Hub credential file has an invalid shape.")
+                    _validate_credential_record(legacy)
+                    if legacy != stored:
+                        raise HubClientError("Windows vault and legacy credential file differ; manual review is required.")
+                    # Only remove the plaintext copy after both records pass
+                    # the same schema/identity validation and match exactly.
+                    legacy_path.unlink()
+                return stored
+
+            # One-time migration: validate before writing, read back and
+            # compare after the vault write, then remove plaintext.
+            if legacy_path.exists():
+                legacy = json.loads(legacy_path.read_text(encoding="utf-8"))
+                if not isinstance(legacy, dict):
+                    raise HubClientError("Legacy Hub credential file has an invalid shape.")
+                _validate_credential_record(legacy)
+                save_credentials(legacy)
+                migrated = load_credentials()
+                if migrated != legacy:
+                    raise HubClientError("Windows Credential Manager did not preserve the migrated credential record.")
+                _validate_credential_record(migrated)
+                legacy_path.unlink()
+                return migrated
+            return None
+        except HubClientError:
+            raise
+        except Exception as exc:
+            raise HubClientError("Windows Credential Manager could not safely load or migrate Hub credentials.") from exc
+
     path = credentials_path()
     if not path.exists():
         return None
@@ -172,29 +279,36 @@ def load_credentials() -> dict[str, object] | None:
         result = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise HubClientError("Local Hub credentials are unreadable; do not delete or overwrite them automatically.") from exc
-    required = {"hub_url", "device_id", "access_token", "refresh_token", "access_expires_at", "refresh_expires_at", "scopes"}
-    if not isinstance(result, dict) or not required.issubset(result):
-        raise HubClientError("Local Hub credentials are incomplete.")
-    try:
-        if validate_hub_url(str(result["hub_url"])) != result["hub_url"]:
-            raise ValueError("Hub URL is not canonical.")
-        stored_device_id = str(UUID(str(result["device_id"])))
-        if not device_id_path().is_file() or device_id_path().read_text(encoding="utf-8").strip() != stored_device_id:
-            raise ValueError("Stored device identity does not match this installation.")
-        if not isinstance(result["access_token"], str) or len(result["access_token"]) < 40:
-            raise ValueError("Access credential is invalid.")
-        if not isinstance(result["refresh_token"], str) or len(result["refresh_token"]) < 40:
-            raise ValueError("Refresh credential is invalid.")
-        if result["scopes"] != ["device.heartbeat"]:
-            raise ValueError("Stored scope is not heartbeat-only.")
-        access_expiry = datetime.fromisoformat(str(result["access_expires_at"]))
-        refresh_expiry = datetime.fromisoformat(str(result["refresh_expires_at"]))
-        if access_expiry.tzinfo is None or refresh_expiry.tzinfo is None:
-            raise ValueError("Credential expiry timestamps must be timezone-aware.")
-    except (ValueError, OSError) as exc:
-        raise HubClientError("Local Hub credentials failed validation; no network request was sent.") from exc
+    if not isinstance(result, dict):
+        raise HubClientError("Local Hub credentials have an invalid shape.")
     return result
 
+def load_credentials() -> dict[str, object] | None:
+    result = _read_credentials_raw()
+    if result is None:
+        return None
+    if not isinstance(result, dict):
+        raise HubClientError("Local Hub credentials have an invalid shape.")
+    return _validate_credential_record(result)
+
+
+def _delete_credentials() -> bool:
+    """Remove both OS-vault and legacy credentials after a user-requested unpair."""
+    was_present = False
+    if platform.system() == "Windows":
+        from el_agent.credential_store import delete_credentials, has_credentials
+        try:
+            was_present = has_credentials()
+            delete_credentials()
+        except Exception as exc:
+            # Do not remove a legacy recovery copy if Vault inspection/removal
+            # failed. The caller must be told that unpair did not complete.
+            raise HubClientError("Could not remove Hub credentials from Windows Credential Manager.") from exc
+    path = credentials_path()
+    if path.exists():
+        path.unlink()
+        was_present = True
+    return was_present
 
 def pair_device(hub_url: str, pairing_code: str) -> dict[str, object]:
     base_url = validate_hub_url(hub_url)
@@ -263,8 +377,8 @@ def heartbeat_once() -> dict[str, object]:
         raise HubClientError("Local Hub credential expiry metadata is invalid.") from exc
     if access_expiry.tzinfo is None or refresh_expiry.tzinfo is None:
         raise HubClientError("Local Hub credential expiry metadata must include a timezone.")
-    if credentials.get("scopes") != ["device.heartbeat"]:
-        raise HubClientError("Local Hub credentials do not have the expected heartbeat-only scope.")
+    if not isinstance(credentials.get("scopes"), list) or "device.heartbeat" not in credentials["scopes"]:
+        raise HubClientError("Local Hub credentials do not include the required heartbeat scope.")
     if refresh_expiry <= now:
         raise HubClientError("Hub refresh credential expired; owner-initiated re-pairing is required.")
     if access_expiry <= now + timedelta(seconds=HEARTBEAT_REFRESH_WINDOW_SECONDS):
@@ -302,19 +416,23 @@ def hub_status() -> dict[str, object]:
 
 
 def unpair_local() -> dict[str, object]:
-    credentials = load_credentials()
-    path = credentials_path()
-    if path.exists():
-        path.unlink()
+    # Unpair is an explicit local credential-removal action. Do not require
+    # credential JSON to parse first: a corrupt Vault value must still be
+    # removable, while a Vault access/delete failure must fail closed.
+    identity_path = device_id_path()
+    device_id = identity_path.read_text(encoding="utf-8").strip() if identity_path.exists() else None
+    was_paired = _delete_credentials()
     return {
         "paired": False,
-        "device_id": credentials["device_id"] if credentials else (device_id_path().read_text(encoding="utf-8").strip() if device_id_path().exists() else None),
-        "remote_revocation_required": credentials is not None,
+        "device_id": device_id,
+        "remote_revocation_required": was_paired,
     }
 
 
 def reset_device_id() -> dict[str, object]:
-    if credentials_path().exists():
+    # Credentials may live in Windows Credential Manager rather than the
+    # legacy JSON path. Validate both storage backends before changing identity.
+    if load_credentials() is not None or credentials_path().exists():
         raise HubClientError("Run unpair first; reset is blocked while local Hub credentials remain.")
     path = device_id_path()
     previous = path.read_text(encoding="utf-8").strip() if path.exists() else None
