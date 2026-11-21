@@ -240,7 +240,9 @@ class MainActivity : Activity() {
                     runOnUiThread {
                         taskButton.isEnabled = true
                         result.onSuccess { claim ->
-                            if (claim == null) {
+                            if (!hub.isPaired()) {
+                                setStatus("Device was unpaired while checking Hub tasks. No approval will be shown; Hub will expire any unreported lease.")
+                            } else if (claim == null) {
                                 setStatus("No supported app.launch task is queued, or an unsupported task was safely rejected.")
                             } else {
                                 showTaskApproval(claim)
@@ -415,10 +417,22 @@ class MainActivity : Activity() {
             text = "Unpair locally"
             backgroundTintList = ColorStateList.valueOf(Color.rgb(69, 38, 48))
             setTextColor(Color.rgb(255, 224, 231))
-            setOnClickListener {
-                HubClient(store).unpairLocally()
-                WorkManager.getInstance(this@MainActivity).cancelUniqueWork("el-agent-heartbeat")
-                setStatus("Local credentials cleared. Revoke the device in Hub to fully disconnect.")
+            setOnClickListener { view ->
+                val unpairButton = view as Button
+                unpairButton.isEnabled = false
+                setBusy("Unpairing from Hub on this device…")
+                executor.execute {
+                    val result = runCatching { HubClient(store).unpairLocally() }
+                    runOnUiThread {
+                        unpairButton.isEnabled = true
+                        result.onSuccess {
+                            WorkManager.getInstance(this@MainActivity).cancelUniqueWork("el-agent-heartbeat")
+                            setStatus("Local credentials cleared. Revoke the device in Hub to fully disconnect.")
+                        }.onFailure { error ->
+                            setStatus(error.message ?: "Local unpair failed; credentials were preserved.")
+                        }
+                    }
+                }
             }
         }, buttonParams())
         root = homeContent
@@ -876,12 +890,23 @@ class MainActivity : Activity() {
                     "Execution must finish within ${claim.timeoutSeconds} seconds after approval."
             )
             .setPositiveButton("Approve and continue") { _, _ ->
+                if (!HubClient(store).isPaired()) {
+                    setStatus("Device was unpaired before approval. No app was opened; Hub will expire the task lease.")
+                    return@setPositiveButton
+                }
                 if (!Instant.now().isBefore(claim.leaseExpiresAt)) {
                     setStatus("The Hub task lease expired before approval. No app was opened; Hub will reconcile the outcome as unknown.")
                     return@setPositiveButton
                 }
                 val started = SystemClock.elapsedRealtime()
-                val launchResult = runCatching { launchAllowlisted(appName) }
+                val launchResult = runCatching {
+                    HubCredentialLock.withLock {
+                        check(HubClient(store).isPaired()) {
+                            "Device was unpaired before task execution; no app was opened."
+                        }
+                        launchAllowlisted(appName)
+                    }
+                }
                 val elapsed = SystemClock.elapsedRealtime() - started
                 if (launchResult.isSuccess) {
                     setStatus("App launch requested. Reporting the outcome to Hub…")
@@ -908,6 +933,10 @@ class MainActivity : Activity() {
         errorCode: String?,
         durationMs: Long
     ) {
+        if (!HubClient(store).isPaired()) {
+            setStatus("Device was unpaired before the outcome report. Hub will reconcile the lease as unknown.")
+            return
+        }
         if (!AndroidTaskPolicy.isWithinExecutionDeadline(durationMs, claim.timeoutSeconds)) {
             setStatus("مهلت اجرای وظیفه تمام شد؛ نتیجه نامشخص است و به Hub گزارش نمی‌شود. وظیفه دوباره اجرا نخواهد شد.")
             return
