@@ -7,6 +7,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
 import java.net.URI
 import java.time.Instant
 import java.util.concurrent.TimeUnit
@@ -71,6 +72,30 @@ internal object HubCredentialLock {
         }
     }
 }
+internal const val MAX_HUB_RESPONSE_BYTES = 64 * 1024
+
+/** Reads Hub JSON responses with a hard cap, including chunked/unknown-length bodies. */
+internal fun readBoundedHubResponse(response: okhttp3.Response): String {
+    val body = response.body ?: return ""
+    if (body.contentLength() > MAX_HUB_RESPONSE_BYTES) {
+        throw IllegalStateException("Hub response exceeded the size limit.")
+    }
+    val output = ByteArrayOutputStream()
+    body.byteStream().use { input ->
+        val buffer = ByteArray(8 * 1024)
+        while (true) {
+            val count = input.read(buffer)
+            if (count < 0) break
+            if (count == 0) continue
+            if (output.size() + count > MAX_HUB_RESPONSE_BYTES) {
+                throw IllegalStateException("Hub response exceeded the size limit.")
+            }
+            output.write(buffer, 0, count)
+        }
+    }
+    return output.toByteArray().toString(Charsets.UTF_8)
+}
+
 internal fun buildHubHttpClient(): OkHttpClient = OkHttpClient.Builder()
     .connectTimeout(10, TimeUnit.SECONDS)
     .readTimeout(12, TimeUnit.SECONDS)
@@ -105,7 +130,7 @@ class HubClient(private val store: SecureStore) {
         if (token != null) builder.header("Authorization", "Bearer $token")
         if (deviceId != null) builder.header("X-Device-ID", deviceId)
         http.newCall(builder.build()).execute().use { response ->
-            val text = response.body?.string().orEmpty()
+            val text = readBoundedHubResponse(response)
             if (!response.isSuccessful) throw IllegalStateException("Hub request failed (HTTP ${response.code}).")
             return JSONObject(text)
         }
