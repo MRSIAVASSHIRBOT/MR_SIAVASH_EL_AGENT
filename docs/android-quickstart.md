@@ -34,8 +34,8 @@ curl --request POST "https://YOUR-HUB-ORIGIN/devices/pairing-challenges" \
     "device_id": "ANDROID_DEVICE_UUID",
     "platform": "android",
     "label": "My Android phone",
-    "advertised_capabilities": ["device.heartbeat"],
-    "scopes": ["device.heartbeat"]
+    "advertised_capabilities": ["device.heartbeat", "app.launch"],
+    "scopes": ["device.heartbeat", "app.launch"]
   }'
 ```
 
@@ -43,7 +43,7 @@ curl --request POST "https://YOUR-HUB-ORIGIN/devices/pairing-challenges" \
 5. The app exchanges the code directly with Hub. The code is not stored. Device credentials are encrypted using an AES-GCM key held by Android Keystore.
 6. Tap **Send heartbeat now** to verify connectivity. WorkManager schedules a network-constrained periodic heartbeat; Android controls the exact execution time to preserve battery.
 
-The owner chooses the scopes in the pairing challenge. Device-advertised capabilities do not grant permissions. For this preview, request only `device.heartbeat`; do not grant future scopes before the corresponding Hub endpoint and Android behavior are released and reviewed.
+The owner chooses the scopes in the pairing challenge. Device-advertised capabilities do not grant permissions. For this preview, request only `device.heartbeat` and `app.launch`. Do not grant `screen.capture`: Android does not implement remote screenshot capture. The app rejects any scope outside this exact set.
 
 ## Local actions
 - **Open ChatGPT** opens the installed ChatGPT Android app when available; otherwise it opens the official `https://chatgpt.com/` website.
@@ -51,12 +51,34 @@ The owner chooses the scopes in the pairing challenge. Device-advertised capabil
 
 These are foreground, user-tapped actions. Android background activity-launch restrictions are respected.
 
+## User-selected local text files
+
+Tap **انتخاب و پیش‌نمایش فایل متنی** and choose a document in Android's system picker. The app uses the Storage Access Framework; it does not request broad storage access. Only text and the supported structured-text MIME types are previewed. Reads are limited to 64 KiB and displayed output to 12,000 characters. Invalid UTF-8, binary content, PDF, and unsupported file types are rejected. Read access is persisted only when the document provider explicitly returns both read and persistable grants; otherwise the temporary picker grant is used for the current session. The contents remain on-device and are not included in cloud chat or Hub requests.
+
+## Online structured planner and reviewed execution (Android 0.5.0)
+
+The Android app includes an explicit online plan-preview panel. Enter an OpenAI API key in the app and save it; it is encrypted in the existing Android Keystore-backed local payload. The default model identifier is `gpt-6.1-terra`, which can be changed to another model enabled for the API account.
+
+When **ساخت برنامهٔ اجرایی (بدون اجرا)** is tapped, only the text typed into the planner request field is sent to the fixed official OpenAI HTTPS Chat Completions endpoint. The app does not attach selected-file contents, microphone audio, screenshots, Hub credentials, or local memory to this request. API usage may incur charges separate from a ChatGPT subscription.
+
+The provider requests strict JSON Schema Structured Outputs. The app then independently validates the response and accepts at most eight ordered steps from this fixed operation set:
+- `open_app`: only the existing `chatgpt` and `browser` aliases
+- `open_url`: HTTPS only, without embedded credentials
+- `read_selected_document`: no path is accepted; a user must choose a document through Android's picker
+- `show_text`: bounded plain text
+
+Unknown fields, unsupported operations, invalid URLs, duplicate IDs, forward dependencies, excessive output, and malformed plans are rejected. After a plan is reviewed, one step at a time can be executed through a separate confirmation dialog. App launches and HTTPS navigation are dispatched through Android intents and remain in a pending state until you return and explicitly confirm the result. Document steps open the system picker; the app verifies the returned read grant before locally previewing the selected text file. A failed step stops the rest of the plan, and uncertain actions are never replayed automatically. Execution state is held only in memory; closing or restarting the app discards it rather than resuming device actions.
+
+## Owner-approved Hub app-launch tasks
+
+The Tools screen includes **Check Hub tasks** for a paired device with the owner-granted `app.launch` scope. Claiming is manual and only available while the app is in the foreground. Each supported ChatGPT/browser launch is shown in a separate approve/reject dialog; no app opens before approval. Android does not accept remote screenshots or background-launch tasks. The Hub lease and the task's execution deadline are checked before an outcome is reported. If the action exceeds its deadline or lease, the result is left unknown and is never replayed. The timeout is an outcome-reporting deadline, not a mechanism that can forcibly stop an Android intent. This feature remains in draft PR #25 and requires a deployed Hub plus physical-device acceptance.
+
 ## Disconnect
 Tap **Unpair locally** to erase the stored Hub credentials while preserving the installation's Device ID. Then revoke the device from the Hub owner device registry. Local unpairing alone does not revoke the server-side device record.
 
 ## Android local push-to-talk
 
-On Android 12 (API 31) or newer, tap **شروع فرمان صوتی (محلی)** and grant microphone permission when prompted. The app uses Android's on-device speech recognizer only (`createOnDeviceSpeechRecognizer`) with `fa-IR`; it does not fall back to a network recognizer. Each capture is automatically stopped after 15 seconds. Availability and Persian language support depend on the device's installed offline recognition service. The only voice actions are opening ChatGPT or the browser. Unsupported speech is rejected. Listening is stopped when the activity leaves the foreground. Local Persian text-to-speech is used when the installed system voice supports it; otherwise the text response remains visible.
+On Android 12 (API 31) or newer, tap **شروع فرمان صوتی (محلی)** and grant microphone permission when prompted. The app uses Android's on-device speech recognizer only (`createOnDeviceSpeechRecognizer`) with `fa-IR`; it does not fall back to a network recognizer. Each capture is automatically stopped after 15 seconds. Availability and Persian language support depend on the device's installed offline recognition service. Voice actions are limited to opening ChatGPT, opening the browser, or requesting a call to the owner-selected contact. A recognized call phrase only opens a confirmation dialog; the call starts only after the owner taps **تماس** and grants Android's `CALL_PHONE` permission. Unsupported speech is rejected. Listening is stopped when the activity leaves the foreground. Local Persian text-to-speech is used when the installed system voice supports it; otherwise the text response remains visible.
 
 ## Current limitations
-This is an Android companion preview, not full Android remote-control. Screenshot capture requires a separate Android MediaProjection consent flow and foreground service, so it is not enabled. Remote task dispatch awaits the Hub task-dispatch API release. The app does not perform arbitrary shell commands, hidden monitoring, unrestricted file access, or background UI interaction.
+This is an Android companion preview, not full Android remote-control. Screenshot capture requires a separate Android MediaProjection consent flow and foreground service, so it is not enabled. The manual foreground-only Hub app.launch consumer is implemented in draft PR #25 but is not merged or live-device accepted. The app does not perform arbitrary shell commands, hidden monitoring, unrestricted file access, or background UI interaction.

@@ -1,0 +1,39 @@
+package ir.mrsiavash.elagent
+
+/**
+ * Android is intentionally a smaller execution surface than Windows.
+ * Only aliases with stable, explicit Android launch behavior are supported.
+ */
+internal object AndroidTaskPolicy {
+    val supportedAppAliases = setOf("chatgpt", "browser")
+
+    fun belongsToDevice(taskDeviceId: String?, localDeviceId: String): Boolean =
+        taskDeviceId != null && taskDeviceId == localDeviceId
+
+    fun areSupportedScopes(grantedScopes: Set<String>): Boolean =
+        "device.heartbeat" in grantedScopes &&
+            grantedScopes.all { it == "device.heartbeat" || it == "app.launch" }
+
+    fun canLaunch(
+        action: String,
+        requiredScope: String,
+        app: String?,
+        grantedScopes: Set<String>
+    ): Boolean =
+        action == "app.launch" &&
+        requiredScope == "app.launch" &&
+        "app.launch" in grantedScopes &&
+        app != null &&
+        app in supportedAppAliases
+
+    /** A late Android intent has an ambiguous outcome; never report or replay it. */
+    fun isWithinExecutionDeadline(durationMs: Long, timeoutSeconds: Long): Boolean =
+        timeoutSeconds in 5L..60L && durationMs in 0L..(timeoutSeconds * 1000L)
+
+    fun denialCode(requiredScope: String, grantedScopes: Set<String>): String =
+        if (requiredScope !in setOf("app.launch", "screen.capture") || requiredScope !in grantedScopes) {
+            "permission_denied"
+        } else {
+            "app_not_available"
+        }
+}
