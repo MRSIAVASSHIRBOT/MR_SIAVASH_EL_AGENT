@@ -97,4 +97,18 @@ class HubCredentialLockTest {
         HubCredentialLock.commitActiveSession {}
     }
 
+    @Test
+    fun isUnpairRequestedImmediatelyDisablesPairedSession() {
+        val generation = HubCredentialLock.pairingGeneration()
+        HubCredentialLock.commitPairing(generation) {}
+        assertTrue("A newly paired session should be active.", !HubCredentialLock.isUnpairRequested())
+
+        HubCredentialLock.requestUnpair()
+        assertTrue("Unpair intent must be visible before disk credentials are cleared.", HubCredentialLock.isUnpairRequested())
+
+        val nextGeneration = HubCredentialLock.pairingGeneration()
+        HubCredentialLock.commitPairing(nextGeneration) {}
+        assertTrue("A successful explicit pairing clears the pending Unpair state.", !HubCredentialLock.isUnpairRequested())
+    }
+
 }
