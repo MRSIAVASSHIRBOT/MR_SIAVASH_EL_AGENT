@@ -23,8 +23,44 @@ data class AndroidDeviceTaskClaim(
 
 internal object HubCredentialLock {
     private val monitor = Any()
+    private val actionMonitor = Any()
+
+    @Volatile
+    private var unpairRequested = false
 
     fun <T> withLock(action: () -> T): T = synchronized(monitor, action)
+
+    /** Set immediately from the UI before local credential deletion is queued. */
+    fun requestUnpair() {
+        synchronized(actionMonitor) {
+            unpairRequested = true
+        }
+    }
+
+    fun isUnpairRequested(): Boolean = unpairRequested
+
+    /** Explicit pairing begins a new local credential session. */
+    fun beginPairing() {
+        synchronized(actionMonitor) {
+            unpairRequested = false
+        }
+    }
+
+    /** Do not commit new credentials if Unpair was requested while pairing was in flight. */
+    fun commitPairing(action: () -> Unit) {
+        synchronized(actionMonitor) {
+            check(!unpairRequested) { "Unpair was requested while pairing was in progress." }
+            action()
+        }
+    }
+
+    /** Serialize an external side effect with the user's immediate Unpair request. */
+    fun <T> withDeviceAction(action: () -> T): T = withLock {
+        synchronized(actionMonitor) {
+            check(!unpairRequested) { "The device is being unpaired; no new external action is allowed." }
+            action()
+        }
+    }
 }
 
 internal fun buildHubHttpClient(): OkHttpClient = OkHttpClient.Builder()
@@ -68,6 +104,7 @@ class HubClient(private val store: SecureStore) {
     }
 
     fun pair(hubInput: String, pairingCodeInput: String): String = HubCredentialLock.withLock {
+        HubCredentialLock.beginPairing()
         val pairingCode = pairingCodeInput.trim()
         require(pairingCode.length in 40..128) { "Pairing code format is invalid." }
         val hub = canonicalHubUrl(hubInput)
@@ -101,15 +138,17 @@ class HubClient(private val store: SecureStore) {
             .put("access_expires_at", now + accessTtl * 1000L)
             .put("refresh_expires_at", now + refreshTtl * 1000L)
             .put("scopes", scopes)
-        store.write(saved)
+        HubCredentialLock.commitPairing { store.write(saved) }
         "Paired successfully. Granted scopes: ${grantedScopes.sorted().joinToString()}"
     }
 
-    fun unpairLocally() = HubCredentialLock.withLock {
-        store.clearCredentialsPreservingIdentity()
+    fun unpairLocally() {
+        HubCredentialLock.requestUnpair()
+        HubCredentialLock.withLock { store.clearCredentialsPreservingIdentity() }
     }
 
     fun refreshIfNeeded(): JSONObject = HubCredentialLock.withLock {
+        check(!HubCredentialLock.isUnpairRequested()) { "Device unpair is in progress; no Hub request will be sent." }
         val saved = store.read()
         val hub = saved.getString("hub_url")
         val id = saved.getString("device_id")
@@ -150,6 +189,7 @@ class HubClient(private val store: SecureStore) {
             saved.getString("hub_url"), "/devices/tasks/claim", JSONObject(),
             saved.getString("access_token"), saved.getString("device_id")
         )
+        if (HubCredentialLock.isUnpairRequested()) return@withLock null
         val task = response.optJSONObject("task") ?: return@withLock null
         require(AndroidTaskPolicy.belongsToDevice(task.optString("device_id", null), saved.getString("device_id"))) {
             "Hub returned a task for a different device identity."
@@ -199,7 +239,9 @@ class HubClient(private val store: SecureStore) {
         errorCode: String?,
         durationMs: Long
     ) = HubCredentialLock.withLock {
-        require(store.read().has("refresh_token")) { "Device was unpaired; the task outcome will remain unknown." }
+        require(!HubCredentialLock.isUnpairRequested() && store.read().has("refresh_token")) {
+            "Device was unpaired; the task outcome will remain unknown."
+        }
         require(AndroidTaskPolicy.isWithinExecutionDeadline(durationMs, claim.timeoutSeconds)) {
             "Hub task execution deadline exceeded; outcome remains unknown and must not be reported."
         }
@@ -234,6 +276,7 @@ class HubClient(private val store: SecureStore) {
             .put("agent_version", "0.3.0")
             .put("runtime_state", "ready")
             .put("app_uptime_seconds", ((SystemClock.elapsedRealtime() - processStartedAt) / 1000L).coerceAtMost(31_536_000L))
+        check(!HubCredentialLock.isUnpairRequested()) { "Device was unpaired; heartbeat was not sent." }
         val response = request(
             saved.getString("hub_url"), "/devices/heartbeat", payload,
             saved.getString("access_token"), saved.getString("device_id")
