@@ -56,7 +56,8 @@ class HubCredentialLockTest {
 
     @Test
     fun requestedUnpairBlocksNewDeviceActionsUntilExplicitPairingStartsAgain() {
-        HubCredentialLock.beginPairing()
+        val initialGeneration = HubCredentialLock.pairingGeneration()
+        HubCredentialLock.commitPairing(initialGeneration) {}
         HubCredentialLock.requestUnpair()
 
         val rejected = runCatching {
@@ -64,14 +65,16 @@ class HubCredentialLockTest {
         }
         assertTrue("A requested Unpair must block new device actions.", rejected.isFailure)
 
-        HubCredentialLock.beginPairing()
+        val newPairingGeneration = HubCredentialLock.pairingGeneration()
+        HubCredentialLock.commitPairing(newPairingGeneration) {}
         val allowed = HubCredentialLock.withDeviceAction { "paired-again" }
         assertEquals("paired-again", allowed)
     }
 
     @Test
     fun refreshedCredentialsCannotBeCommittedAfterUnpairWasRequested() {
-        HubCredentialLock.beginPairing()
+        val initialGeneration = HubCredentialLock.pairingGeneration()
+        HubCredentialLock.commitPairing(initialGeneration) {}
         HubCredentialLock.requestUnpair()
 
         val commit = runCatching {
@@ -81,10 +84,17 @@ class HubCredentialLockTest {
         }
         assertTrue("Refresh commit must be rejected after Unpair.", commit.isFailure)
 
-        HubCredentialLock.beginPairing()
+        val stalePairingGeneration = initialGeneration
+        val staleCommit = runCatching {
+            HubCredentialLock.commitPairing(stalePairingGeneration) {}
+        }
+        assertTrue("An Unpair request during pairing must invalidate that attempt.", staleCommit.isFailure)
+
+        val newPairingGeneration = HubCredentialLock.pairingGeneration()
         var committed = false
-        HubCredentialLock.commitActiveSession { committed = true }
-        assertTrue("Explicit new pairing may commit its credentials.", committed)
+        HubCredentialLock.commitPairing(newPairingGeneration) { committed = true }
+        assertTrue("A later explicit pairing may commit its credentials.", committed)
+        HubCredentialLock.commitActiveSession {}
     }
 
 }
