@@ -31,8 +31,6 @@ class _NoRedirectHandler(HTTPRedirectHandler):
     def redirect_request(self, request, file_pointer, code, message, headers, new_url):
         # Never follow cross-origin or same-origin redirects for authenticated
         # device requests. A redirect is a protocol failure, not a new trust root.
-        from urllib.error import HTTPError
-
         raise HTTPError(request.full_url, code, message, headers, file_pointer)
 
 
