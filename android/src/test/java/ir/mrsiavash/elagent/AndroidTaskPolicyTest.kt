@@ -39,6 +39,14 @@ class AndroidTaskPolicyTest {
         assertEquals("app_not_available", AndroidTaskPolicy.denialCode("app.launch", scopes))
     }
 
+    @Test fun rejectsOutcomeReportingAfterExecutionDeadline() {
+        assertTrue(AndroidTaskPolicy.isWithinExecutionDeadline(0L, 15L))
+        assertTrue(AndroidTaskPolicy.isWithinExecutionDeadline(15_000L, 15L))
+        assertFalse(AndroidTaskPolicy.isWithinExecutionDeadline(15_001L, 15L))
+        assertFalse(AndroidTaskPolicy.isWithinExecutionDeadline(-1L, 15L))
+        assertFalse(AndroidTaskPolicy.isWithinExecutionDeadline(1_000L, 61L))
+    }
+
     @Test fun bindsTaskToTheExactPairedDevice() {
         val ownerDeviceId = "00000000-0000-0000-0000-000000000001"
         assertTrue(AndroidTaskPolicy.belongsToDevice(ownerDeviceId, ownerDeviceId))
