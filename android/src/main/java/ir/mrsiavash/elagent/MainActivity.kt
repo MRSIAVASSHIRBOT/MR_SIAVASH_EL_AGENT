@@ -423,7 +423,7 @@ class MainActivity : Activity() {
                 unpairButton.isEnabled = false
                 setBusy("Unpairing from Hub on this device…")
                 executor.execute {
-                    val result = runCatching { HubClient(store).unpairLocally() }
+                    val result = runCatching { HubClient(store).unpairLocally(requestAlreadyMarked = true) }
                     runOnUiThread {
                         unpairButton.isEnabled = true
                         result.onSuccess {
