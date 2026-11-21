@@ -140,17 +140,17 @@ class HubClient(private val store: SecureStore) {
         }
     }
 
-    fun claimTask(): AndroidDeviceTaskClaim? {
+    fun claimTask(): AndroidDeviceTaskClaim? = HubCredentialLock.withLock {
         val saved = refreshIfNeeded()
-        val scopes = saved.optJSONArray("scopes") ?: return null
+        val scopes = saved.optJSONArray("scopes") ?: return@withLock null
         val grantedScopes = (0 until scopes.length()).map { scopes.optString(it) }.toSet()
-        if ("app.launch" !in grantedScopes) return null
+        if ("app.launch" !in grantedScopes) return@withLock null
 
         val response = request(
             saved.getString("hub_url"), "/devices/tasks/claim", JSONObject(),
             saved.getString("access_token"), saved.getString("device_id")
         )
-        val task = response.optJSONObject("task") ?: return null
+        val task = response.optJSONObject("task") ?: return@withLock null
         require(AndroidTaskPolicy.belongsToDevice(task.optString("device_id", null), saved.getString("device_id"))) {
             "Hub returned a task for a different device identity."
         }
@@ -188,9 +188,9 @@ class HubClient(private val store: SecureStore) {
                 errorCode = AndroidTaskPolicy.denialCode(requiredScope, grantedScopes),
                 durationMs = 0L
             )
-            return null
+            return@withLock null
         }
-        return claim
+        claim
     }
 
     fun completeTask(
@@ -198,7 +198,8 @@ class HubClient(private val store: SecureStore) {
         succeeded: Boolean,
         errorCode: String?,
         durationMs: Long
-    ) {
+    ) = HubCredentialLock.withLock {
+        require(store.read().has("refresh_token")) { "Device was unpaired; the task outcome will remain unknown." }
         require(AndroidTaskPolicy.isWithinExecutionDeadline(durationMs, claim.timeoutSeconds)) {
             "Hub task execution deadline exceeded; outcome remains unknown and must not be reported."
         }
@@ -227,7 +228,7 @@ class HubClient(private val store: SecureStore) {
         }
     }
 
-    fun heartbeat(): String {
+    fun heartbeat(): String = HubCredentialLock.withLock {
         val saved = refreshIfNeeded()
         val payload = JSONObject()
             .put("agent_version", "0.3.0")
@@ -237,8 +238,8 @@ class HubClient(private val store: SecureStore) {
             saved.getString("hub_url"), "/devices/heartbeat", payload,
             saved.getString("access_token"), saved.getString("device_id")
         )
-        return "Hub heartbeat: ${response.optString("status", "unknown")}"
+        "Hub heartbeat: ${response.optString("status", "unknown")}"
     }
 
-    fun isPaired(): Boolean = store.read().has("refresh_token")
+    fun isPaired(): Boolean = HubCredentialLock.withLock { store.read().has("refresh_token") }
 }
