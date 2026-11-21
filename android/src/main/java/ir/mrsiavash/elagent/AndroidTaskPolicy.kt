@@ -26,6 +26,7 @@ internal object AndroidTaskPolicy {
         app != null &&
         app in supportedAppAliases
 
+    /** A late Android intent has an ambiguous outcome; never report or replay it. */
     fun isWithinExecutionDeadline(durationMs: Long, timeoutSeconds: Long): Boolean =
         timeoutSeconds in 5L..60L && durationMs in 0L..(timeoutSeconds * 1000L)
 
