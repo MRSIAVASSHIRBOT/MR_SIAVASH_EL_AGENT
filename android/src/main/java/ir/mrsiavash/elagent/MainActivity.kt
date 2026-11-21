@@ -908,6 +908,10 @@ class MainActivity : Activity() {
         errorCode: String?,
         durationMs: Long
     ) {
+        if (!AndroidTaskPolicy.isWithinExecutionDeadline(durationMs, claim.timeoutSeconds)) {
+            setStatus("مهلت اجرای وظیفه تمام شد؛ نتیجه نامشخص است و به Hub گزارش نمی‌شود. وظیفه دوباره اجرا نخواهد شد.")
+            return
+        }
         if (!Instant.now().isBefore(claim.leaseExpiresAt)) {
             setStatus("The Hub task lease expired. No outcome was replayed; Hub will reconcile it as unknown.")
             return
