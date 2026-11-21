@@ -7,6 +7,7 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.concurrent.TimeUnit
 
@@ -42,4 +43,43 @@ class HubClientTransportTest {
             destination.shutdown()
         }
     }
+
+    @Test
+    fun rejectsHubResponsesLargerThanTheClientLimit() {
+        val server = MockWebServer()
+        server.start()
+        try {
+            server.enqueue(MockResponse().setBody("x".repeat(MAX_HUB_RESPONSE_BYTES + 1)))
+            val response = okhttp3.OkHttpClient().newCall(
+                Request.Builder().url(server.url("/oversized")).build()
+            ).execute()
+            val result = response.use { runCatching { readBoundedHubResponse(it) } }
+
+            assertTrue("Known-length oversized Hub bodies must be rejected.", result.isFailure)
+            assertEquals("Hub response exceeded the size limit.", result.exceptionOrNull()?.message)
+        } finally {
+            server.shutdown()
+        }
+    }
+
+    @Test
+    fun rejectsChunkedHubResponsesLargerThanTheClientLimit() {
+        val server = MockWebServer()
+        server.start()
+        try {
+            server.enqueue(
+                MockResponse().setChunkedBody("x".repeat(MAX_HUB_RESPONSE_BYTES + 1), 1024)
+            )
+            val response = okhttp3.OkHttpClient().newCall(
+                Request.Builder().url(server.url("/chunked-oversized")).build()
+            ).execute()
+            val result = response.use { runCatching { readBoundedHubResponse(it) } }
+
+            assertTrue("Unknown-length chunked Hub bodies must be rejected.", result.isFailure)
+            assertEquals("Hub response exceeded the size limit.", result.exceptionOrNull()?.message)
+        } finally {
+            server.shutdown()
+        }
+    }
+
 }
