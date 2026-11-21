@@ -43,6 +43,9 @@ class AndroidTaskPolicyTest {
         assertTrue(AndroidTaskPolicy.isWithinExecutionDeadline(0L, 15L))
         assertTrue(AndroidTaskPolicy.isWithinExecutionDeadline(15_000L, 15L))
         assertFalse(AndroidTaskPolicy.isWithinExecutionDeadline(15_001L, 15L))
+        assertTrue(AndroidTaskPolicy.isWithinExecutionDeadline(60_000L, 60L))
+        assertFalse(AndroidTaskPolicy.isWithinExecutionDeadline(60_001L, 60L))
+        assertFalse(AndroidTaskPolicy.isWithinExecutionDeadline(1L, 4L))
         assertFalse(AndroidTaskPolicy.isWithinExecutionDeadline(-1L, 15L))
         assertFalse(AndroidTaskPolicy.isWithinExecutionDeadline(1_000L, 61L))
     }
