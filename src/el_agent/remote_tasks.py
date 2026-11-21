@@ -194,7 +194,8 @@ def execute_claimed(claimed: dict[str, Any]) -> dict[str, Any]:
     duration_seconds = max(0.0, time.monotonic() - started)
     duration_ms = min(60_000, int(duration_seconds * 1000))
 
-    # A timeout cannot safely terminate an OS launch or screenshot operation.
+    # This is a reporting deadline, not process cancellation: Python cannot
+    # safely terminate an OS launch or screenshot operation from this worker.
     # If the local deadline is exceeded, its real-world effect is ambiguous:
     # do not report success or failure and never replay it. Hub will reconcile
     # the still-claimed task as unknown_outcome when its lease expires.
