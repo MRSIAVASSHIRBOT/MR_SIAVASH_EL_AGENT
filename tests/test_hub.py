@@ -1,5 +1,7 @@
 import json
 from datetime import datetime, timedelta, timezone
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from threading import Thread
 
 import pytest
 
@@ -224,3 +226,56 @@ def test_device_id_reset_requires_local_unpair_and_creates_new_identity(tmp_path
     assert result["previous_device_id"] == old_id
     assert result["device_id"] != old_id
     assert hub.get_device_id() == result["device_id"]
+
+
+def test_authenticated_hub_request_rejects_redirect_without_forwarding_bearer_token():
+    forwarded_authorization = []
+
+    class DestinationHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            forwarded_authorization.append(self.headers.get("Authorization"))
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b'{"unexpected": true}')
+
+        def log_message(self, *_args):
+            pass
+
+    destination = ThreadingHTTPServer(("127.0.0.1", 0), DestinationHandler)
+    destination_thread = Thread(target=destination.serve_forever, daemon=True)
+    destination_thread.start()
+
+    class RedirectHandler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            self.send_response(302)
+            self.send_header(
+                "Location",
+                f"http://127.0.0.1:{destination.server_port}/collect",
+            )
+            self.end_headers()
+
+        def log_message(self, *_args):
+            pass
+
+    origin = ThreadingHTTPServer(("127.0.0.1", 0), RedirectHandler)
+    origin_thread = Thread(target=origin.serve_forever, daemon=True)
+    origin_thread.start()
+    bearer = "Bearer " + _token("s")
+
+    try:
+        with pytest.raises(hub.HubClientError, match=r"HTTP 302"):
+            hub._request_json(
+                f"http://127.0.0.1:{origin.server_port}",
+                "/devices/heartbeat",
+                method="POST",
+                payload={"runtime_state": "ready"},
+                headers={"Authorization": bearer},
+            )
+        assert forwarded_authorization == []
+    finally:
+        origin.shutdown()
+        destination.shutdown()
+        origin.server_close()
+        destination.server_close()
+        origin_thread.join(timeout=2)
+        destination_thread.join(timeout=2)
