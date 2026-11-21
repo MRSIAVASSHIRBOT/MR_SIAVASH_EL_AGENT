@@ -57,17 +57,25 @@ Tap **انتخاب و پیش‌نمایش فایل متنی** and choose a docum
 
 ## Online structured planner and reviewed execution (Android 0.5.0)
 
-The Android app includes an explicit online plan-preview panel. Enter an OpenAI API key in the app and save it; it is encrypted in the existing Android Keystore-backed local payload. The default model identifier is `gpt-6.1-terra`, which can be changed to another model enabled for the API account.
+The planner uses a zero-cost-first provider chain. It does not use the legacy OpenAI API key and has no paid-provider fallback.
 
-When **ساخت برنامهٔ اجرایی (بدون اجرا)** is tapped, only the text typed into the planner request field is sent to the fixed official OpenAI HTTPS Chat Completions endpoint. The app does not attach selected-file contents, microphone audio, screenshots, Hub credentials, or local memory to this request. API usage may incur charges separate from a ChatGPT subscription.
+1. In the Planner panel, enter a Google Gemini API key and/or an OpenRouter API key using the matching **ذخیره امن کلید** control.
+2. The default order is Google Gemini API Free tier (`gemini-4-hydrogen`), followed by OpenRouter's free-model router (`openrouter/free`). Only providers with a locally saved key are attempted.
+3. Keep the Google AI Studio project on the Free tier with billing disabled. The app cannot inspect the project's billing configuration, so it cannot guarantee zero cost if billing is enabled. OpenRouter is restricted to a free model route; quotas and availability may change.
+4. When a provider fails, the same typed request may be sent to the next configured provider. Free-tier providers may process prompts under their own data-use terms; do not submit sensitive or confidential information.
 
-The provider requests strict JSON Schema Structured Outputs. The app then independently validates the response and accepts at most eight ordered steps from this fixed operation set:
+When **ساخت برنامهٔ اجرایی (بدون اجرا)** is tapped, only the text typed into the planner request field and the fixed system prompt are sent to the configured free provider. Selected files, microphone audio, screenshots, Hub credentials, and local memory are excluded. The app validates the returned JSON locally and displays a plan; no step runs automatically.
+
+Each proposed step must pass the local capability policy and requires a separate owner confirmation before execution. Supported operations are limited to:
 - `open_app`: only the existing `chatgpt` and `browser` aliases
 - `open_url`: HTTPS only, without embedded credentials
 - `read_selected_document`: no path is accepted; a user must choose a document through Android's picker
 - `show_text`: bounded plain text
 
-Unknown fields, unsupported operations, invalid URLs, duplicate IDs, forward dependencies, excessive output, and malformed plans are rejected. After a plan is reviewed, one step at a time can be executed through a separate confirmation dialog. App launches and HTTPS navigation are dispatched through Android intents and remain in a pending state until you return and explicitly confirm the result. Document steps open the system picker; the app verifies the returned read grant before locally previewing the selected text file. A failed step stops the rest of the plan, and uncertain actions are never replayed automatically. Execution state is held only in memory; closing or restarting the app discards it rather than resuming device actions.
+Unknown fields, unsupported operations, invalid URLs, duplicate IDs, forward dependencies, excessive output, and malformed plans are rejected. App launches and HTTPS navigation are dispatched through Android intents and remain pending until the owner returns and explicitly confirms the result. Document steps use the system picker and verify the returned read grant. A failed step stops the rest of the plan. Execution state is held only in memory; closing or restarting the app discards it rather than resuming device actions.
+
+The legacy OpenAI key may remain in encrypted local storage for compatibility, but this planner does not call the OpenAI API. No paid API request or automatic provider upgrade is performed by this planner.
+
 
 ## Owner-approved Hub app-launch tasks
 
