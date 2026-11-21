@@ -54,4 +54,19 @@ class HubCredentialLockTest {
         assertEquals("nested-credential-operation", result)
     }
 
+    @Test
+    fun requestedUnpairBlocksNewDeviceActionsUntilExplicitPairingStartsAgain() {
+        HubCredentialLock.beginPairing()
+        HubCredentialLock.requestUnpair()
+
+        val rejected = runCatching {
+            HubCredentialLock.withDeviceAction { "must-not-run" }
+        }
+        assertTrue("A requested Unpair must block new device actions.", rejected.isFailure)
+
+        HubCredentialLock.beginPairing()
+        val allowed = HubCredentialLock.withDeviceAction { "paired-again" }
+        assertEquals("paired-again", allowed)
+    }
+
 }
