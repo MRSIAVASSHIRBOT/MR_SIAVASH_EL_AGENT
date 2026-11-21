@@ -69,4 +69,22 @@ class HubCredentialLockTest {
         assertEquals("paired-again", allowed)
     }
 
+    @Test
+    fun refreshedCredentialsCannotBeCommittedAfterUnpairWasRequested() {
+        HubCredentialLock.beginPairing()
+        HubCredentialLock.requestUnpair()
+
+        val commit = runCatching {
+            HubCredentialLock.commitActiveSession {
+                throw AssertionError("Credential commit must not run after Unpair.")
+            }
+        }
+        assertTrue("Refresh commit must be rejected after Unpair.", commit.isFailure)
+
+        HubCredentialLock.beginPairing()
+        var committed = false
+        HubCredentialLock.commitActiveSession { committed = true }
+        assertTrue("Explicit new pairing may commit its credentials.", committed)
+    }
+
 }
