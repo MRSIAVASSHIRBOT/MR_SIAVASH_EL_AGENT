@@ -193,6 +193,18 @@ def execute_claimed(claimed: dict[str, Any]) -> dict[str, Any]:
 
     duration_ms = min(60_000, max(0, int((time.monotonic() - started) * 1000)))
 
+    # A timeout cannot safely terminate an OS launch or screenshot operation.
+    # If the local deadline is exceeded, its real-world effect is ambiguous:
+    # do not report success or failure and never replay it. Hub will reconcile
+    # the still-claimed task as unknown_outcome when its lease expires.
+    if timeout_valid and duration_ms > timeout * 1000:
+        return {
+            "task_id": task_id,
+            "reported_status": "not_reported_timeout",
+            "outcome_verified": None,
+            "action_attempted": action_started,
+        }
+
     # An action may have taken effect even if it ran beyond its lease. Never
     # report a late success/failure or replay it; Hub will reconcile expiry as
     # unknown_outcome. This is safer than treating delivery as exactly-once.
@@ -230,10 +242,10 @@ async def hub_task_loop() -> None:
             claimed = await asyncio.to_thread(claim_one)
             if claimed is not None:
                 result = await asyncio.to_thread(execute_claimed, claimed)
-                if result["reported_status"] == "not_reported_lease_expired":
+                if result["reported_status"] in {"not_reported_lease_expired", "not_reported_timeout"}:
                     logger.warning(
-                        "Hub task lease expired before completion reporting: task_id=%s action_attempted=%s; Hub will reconcile as unknown_outcome and the Agent will not replay it.",
-                        result["task_id"], result["action_attempted"],
+                        "Hub task outcome was not reported because its local deadline or lease expired: task_id=%s status=%s action_attempted=%s; Hub will reconcile as unknown_outcome and the Agent will not replay it.",
+                        result["task_id"], result["reported_status"], result["action_attempted"],
                     )
                 else:
                     logger.info(
