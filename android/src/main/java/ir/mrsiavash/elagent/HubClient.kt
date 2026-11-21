@@ -27,14 +27,16 @@ internal object HubCredentialLock {
     fun <T> withLock(action: () -> T): T = synchronized(monitor, action)
 }
 
+internal fun buildHubHttpClient(): OkHttpClient = OkHttpClient.Builder()
+    .connectTimeout(10, TimeUnit.SECONDS)
+    .readTimeout(12, TimeUnit.SECONDS)
+    .callTimeout(20, TimeUnit.SECONDS)
+    .followRedirects(false)
+    .followSslRedirects(false)
+    .build()
+
 class HubClient(private val store: SecureStore) {
-    private val http = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(12, TimeUnit.SECONDS)
-        .callTimeout(20, TimeUnit.SECONDS)
-        .followRedirects(false)
-        .followSslRedirects(false)
-        .build()
+    private val http = buildHubHttpClient()
     private val jsonType = "application/json; charset=utf-8".toMediaType()
 
     companion object {
