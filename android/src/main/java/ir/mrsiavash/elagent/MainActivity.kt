@@ -873,7 +873,7 @@ class MainActivity : Activity() {
             .setMessage(
                 "The Hub has requested to open '$appName' on this device. " +
                     "Nothing will happen unless you approve this request. " +
-                    "The task expires after ${claim.timeoutSeconds} seconds."
+                    "Execution must finish within ${claim.timeoutSeconds} seconds after approval."
             )
             .setPositiveButton("Approve and continue") { _, _ ->
                 if (!Instant.now().isBefore(claim.leaseExpiresAt)) {
