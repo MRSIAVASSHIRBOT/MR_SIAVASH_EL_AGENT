@@ -126,6 +126,7 @@ class SecureStore(private val context: android.content.Context) {
         write(value)
     }
 
+    @Synchronized
     fun clearCredentialsPreservingIdentity() {
         val value = read()
         value.remove("hub_url")
@@ -137,6 +138,7 @@ class SecureStore(private val context: android.content.Context) {
         write(value)
     }
 
+    @Synchronized
     fun deviceId(): String {
         val value = read()
         val current = value.optString("device_id", "")
