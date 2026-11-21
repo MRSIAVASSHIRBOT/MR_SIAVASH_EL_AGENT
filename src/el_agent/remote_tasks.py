@@ -191,13 +191,14 @@ def execute_claimed(claimed: dict[str, Any]) -> dict[str, Any]:
             logger.exception("Hub device task failed")
             outcome, error_code = "failed", "execution_failed"
 
-    duration_ms = min(60_000, max(0, int((time.monotonic() - started) * 1000)))
+    duration_seconds = max(0.0, time.monotonic() - started)
+    duration_ms = min(60_000, int(duration_seconds * 1000))
 
     # A timeout cannot safely terminate an OS launch or screenshot operation.
     # If the local deadline is exceeded, its real-world effect is ambiguous:
     # do not report success or failure and never replay it. Hub will reconcile
     # the still-claimed task as unknown_outcome when its lease expires.
-    if timeout_valid and duration_ms > timeout * 1000:
+    if timeout_valid and duration_seconds > timeout:
         return {
             "task_id": task_id,
             "reported_status": "not_reported_timeout",
