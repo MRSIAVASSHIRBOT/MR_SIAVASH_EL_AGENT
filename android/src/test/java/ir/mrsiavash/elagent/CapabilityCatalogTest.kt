@@ -90,6 +90,19 @@ class CapabilityCatalogTest {
         assertTrue(allowed.allowed)
     }
 
+    @Test fun initiatingCallsRequiresRecipientConfirmation() {
+        val notConfirmed = CapabilityCatalog.evaluate(
+            CapabilityId.CALL_INITIATE, ActionEffect.EXTERNAL_COMMUNICATION, context()
+        )
+        val confirmed = CapabilityCatalog.evaluate(
+            CapabilityId.CALL_INITIATE, ActionEffect.EXTERNAL_COMMUNICATION,
+            context(confirmations = setOf("action-1"))
+        )
+        assertFalse(notConfirmed.allowed)
+        assertTrue(notConfirmed.requiresConfirmation)
+        assertTrue(confirmed.allowed)
+    }
+
     @Test fun contactChangesRequirePermissionAndConfirmation() {
         val permissionOnly = CapabilityCatalog.evaluate(
             CapabilityId.CONTACTS_WRITE, ActionEffect.LOCAL_CHANGE,
