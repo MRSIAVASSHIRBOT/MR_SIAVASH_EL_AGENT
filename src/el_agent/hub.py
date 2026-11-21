@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 from uuid import UUID, uuid4
 
 from el_agent.service import data_dir
@@ -23,6 +23,22 @@ AGENT_STARTED_AT = time.monotonic()
 
 class HubClientError(RuntimeError):
     """Raised when Hub pairing or device synchronization cannot complete."""
+
+
+class _NoRedirectHandler(HTTPRedirectHandler):
+    """Reject redirects so bearer credentials remain bound to the configured Hub origin."""
+
+    def redirect_request(self, request, file_pointer, code, message, headers, new_url):
+        # Never follow cross-origin or same-origin redirects for authenticated
+        # device requests. A redirect is a protocol failure, not a new trust root.
+        from urllib.error import HTTPError
+
+        raise HTTPError(request.full_url, code, message, headers, file_pointer)
+
+
+# Keep the public module-level name patchable by tests while using an opener
+# that has no automatic redirect handler in production.
+urlopen = build_opener(_NoRedirectHandler).open
 
 
 def device_id_path() -> Path:
