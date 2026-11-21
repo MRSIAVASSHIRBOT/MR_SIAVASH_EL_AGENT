@@ -27,34 +27,35 @@ internal object HubCredentialLock {
 
     @Volatile
     private var unpairRequested = false
+    private var unpairGeneration = 0L
 
     fun <T> withLock(action: () -> T): T = synchronized(monitor, action)
 
     /** Set immediately from the UI before local credential deletion is queued. */
     fun requestUnpair() {
         synchronized(actionMonitor) {
+            unpairGeneration += 1
             unpairRequested = true
         }
     }
 
     fun isUnpairRequested(): Boolean = unpairRequested
 
-    /** Explicit pairing begins a new local credential session. */
-    fun beginPairing() {
+    /** Capture the request generation before beginning the network pairing exchange. */
+    fun pairingGeneration(): Long = synchronized(actionMonitor) { unpairGeneration }
+
+    /** Commit credentials only if no newer Unpair request arrived during pairing. */
+    fun commitPairing(generation: Long, action: () -> Unit) {
         synchronized(actionMonitor) {
+            check(unpairGeneration == generation) {
+                "Unpair was requested while pairing was in progress."
+            }
+            action()
             unpairRequested = false
         }
     }
 
-    /** Do not commit new credentials if Unpair was requested while pairing was in flight. */
-    fun commitPairing(action: () -> Unit) {
-        synchronized(actionMonitor) {
-            check(!unpairRequested) { "Unpair was requested while pairing was in progress." }
-            action()
-        }
-    }
-
-    /** Commit a credential refresh only while the paired session is still active. */
+    /** Commit a refresh only while the paired session is still active. */
     fun commitActiveSession(action: () -> Unit) {
         synchronized(actionMonitor) {
             check(!unpairRequested) { "Unpair was requested; refreshed credentials were not stored." }
@@ -70,7 +71,6 @@ internal object HubCredentialLock {
         }
     }
 }
-
 internal fun buildHubHttpClient(): OkHttpClient = OkHttpClient.Builder()
     .connectTimeout(10, TimeUnit.SECONDS)
     .readTimeout(12, TimeUnit.SECONDS)
@@ -112,7 +112,7 @@ class HubClient(private val store: SecureStore) {
     }
 
     fun pair(hubInput: String, pairingCodeInput: String): String = HubCredentialLock.withLock {
-        HubCredentialLock.beginPairing()
+        val pairingGeneration = HubCredentialLock.pairingGeneration()
         val pairingCode = pairingCodeInput.trim()
         require(pairingCode.length in 40..128) { "Pairing code format is invalid." }
         val hub = canonicalHubUrl(hubInput)
@@ -146,12 +146,12 @@ class HubClient(private val store: SecureStore) {
             .put("access_expires_at", now + accessTtl * 1000L)
             .put("refresh_expires_at", now + refreshTtl * 1000L)
             .put("scopes", scopes)
-        HubCredentialLock.commitPairing { store.write(saved) }
+        HubCredentialLock.commitPairing(pairingGeneration) { store.write(saved) }
         "Paired successfully. Granted scopes: ${grantedScopes.sorted().joinToString()}"
     }
 
-    fun unpairLocally() {
-        HubCredentialLock.requestUnpair()
+    fun unpairLocally(requestAlreadyMarked: Boolean = false) {
+        if (!requestAlreadyMarked) HubCredentialLock.requestUnpair()
         HubCredentialLock.withLock { store.clearCredentialsPreservingIdentity() }
     }
 
