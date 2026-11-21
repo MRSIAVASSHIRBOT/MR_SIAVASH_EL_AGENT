@@ -21,6 +21,12 @@ data class AndroidDeviceTaskClaim(
     val leaseExpiresAt: Instant
 )
 
+internal object HubCredentialLock {
+    private val monitor = Any()
+
+    fun <T> withLock(action: () -> T): T = synchronized(monitor, action)
+}
+
 class HubClient(private val store: SecureStore) {
     private val http = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
@@ -32,7 +38,6 @@ class HubClient(private val store: SecureStore) {
     private val jsonType = "application/json; charset=utf-8".toMediaType()
 
     companion object {
-        private val credentialLock = Any()
         private val processStartedAt = SystemClock.elapsedRealtime()
     }
 
@@ -60,7 +65,7 @@ class HubClient(private val store: SecureStore) {
         }
     }
 
-    fun pair(hubInput: String, pairingCodeInput: String): String {
+    fun pair(hubInput: String, pairingCodeInput: String): String = HubCredentialLock.withLock {
         val pairingCode = pairingCodeInput.trim()
         require(pairingCode.length in 40..128) { "Pairing code format is invalid." }
         val hub = canonicalHubUrl(hubInput)
@@ -95,10 +100,14 @@ class HubClient(private val store: SecureStore) {
             .put("refresh_expires_at", now + refreshTtl * 1000L)
             .put("scopes", scopes)
         store.write(saved)
-        return "Paired successfully. Granted scopes: ${grantedScopes.sorted().joinToString()}"
+        "Paired successfully. Granted scopes: ${grantedScopes.sorted().joinToString()}"
     }
 
-    fun refreshIfNeeded(): JSONObject = synchronized(credentialLock) {
+    fun unpairLocally() = HubCredentialLock.withLock {
+        store.clearCredentialsPreservingIdentity()
+    }
+
+    fun refreshIfNeeded(): JSONObject = HubCredentialLock.withLock {
         val saved = store.read()
         val hub = saved.getString("hub_url")
         val id = saved.getString("device_id")
