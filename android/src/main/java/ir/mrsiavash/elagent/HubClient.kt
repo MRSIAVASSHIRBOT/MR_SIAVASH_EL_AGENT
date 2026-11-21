@@ -54,6 +54,14 @@ internal object HubCredentialLock {
         }
     }
 
+    /** Commit a credential refresh only while the paired session is still active. */
+    fun commitActiveSession(action: () -> Unit) {
+        synchronized(actionMonitor) {
+            check(!unpairRequested) { "Unpair was requested; refreshed credentials were not stored." }
+            action()
+        }
+    }
+
     /** Serialize an external side effect with the user's immediate Unpair request. */
     fun <T> withDeviceAction(action: () -> T): T = withLock {
         synchronized(actionMonitor) {
@@ -174,17 +182,19 @@ class HubClient(private val store: SecureStore) {
                 .put("refresh_token", refresh)
                 .put("access_expires_at", System.currentTimeMillis() + accessTtl * 1000L)
                 .put("refresh_expires_at", System.currentTimeMillis() + refreshTtl * 1000L)
-            store.write(saved)
+            HubCredentialLock.commitActiveSession { store.write(saved) }
             saved
         }
     }
 
     fun claimTask(): AndroidDeviceTaskClaim? = HubCredentialLock.withLock {
         val saved = refreshIfNeeded()
+        if (HubCredentialLock.isUnpairRequested()) return@withLock null
         val scopes = saved.optJSONArray("scopes") ?: return@withLock null
         val grantedScopes = (0 until scopes.length()).map { scopes.optString(it) }.toSet()
         if ("app.launch" !in grantedScopes) return@withLock null
 
+        if (HubCredentialLock.isUnpairRequested()) return@withLock null
         val response = request(
             saved.getString("hub_url"), "/devices/tasks/claim", JSONObject(),
             saved.getString("access_token"), saved.getString("device_id")
@@ -249,6 +259,7 @@ class HubClient(private val store: SecureStore) {
             "Hub task lease expired before the outcome could be reported."
         }
         val saved = refreshIfNeeded()
+        require(!HubCredentialLock.isUnpairRequested()) { "Device was unpaired; no task outcome was sent." }
         val payload = JSONObject()
             .put("lease_token", claim.leaseToken)
             .put("outcome", if (succeeded) "succeeded" else "failed")
@@ -272,6 +283,7 @@ class HubClient(private val store: SecureStore) {
 
     fun heartbeat(): String = HubCredentialLock.withLock {
         val saved = refreshIfNeeded()
+        check(!HubCredentialLock.isUnpairRequested()) { "Device was unpaired; heartbeat was not sent." }
         val payload = JSONObject()
             .put("agent_version", "0.3.0")
             .put("runtime_state", "ready")
