@@ -22,7 +22,7 @@ MR_SIAVASH_HUB_AI is the authority for device identity, scoped credentials, regi
 
 The Android companion now uses a four-section interface: Home, AI Planner, Tools, and Device Connection. Local push-to-talk voice commands include opening ChatGPT/browser and calling the user-selected Father contact. The contact is stored in the Android Keystore-backed encrypted payload.
 
-For direct calls, the owner selects the contact once from Android's system contact picker. The explicit voice command `سیا، با پدر تماس بگیر` starts the call without an in-app confirmation dialog. Android still requires its own `CALL_PHONE` runtime permission; the app cannot bypass the operating system permission prompt. Voice capture remains push-to-talk and on-device; always-on wake-word detection is not included.
+For direct calls, the owner selects the contact once from Android's system contact picker. The explicit voice command `سیا، با پدر تماس بگیر` opens a recipient confirmation dialog. A separate tap on **تماس** is required before the app requests Android's `CALL_PHONE` runtime permission and places the call. Voice capture remains push-to-talk and on-device; always-on wake-word detection is not included.
 
 ## Requirements
 
