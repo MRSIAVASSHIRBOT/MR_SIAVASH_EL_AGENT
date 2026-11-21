@@ -66,7 +66,7 @@ def test_execute_claimed_reports_allowlisted_launch(monkeypatch):
     reports = []
     monkeypatch.setattr(remote_tasks, "launch_app", lambda alias: launched.append(alias))
     monkeypatch.setattr(remote_tasks, "_post", lambda creds, path, payload: reports.append((path, payload)) or {
-        "task": {"status": "reported_succeeded", "outcome_verified": False}
+        "task": {"task_id": "00000000-0000-0000-0000-000000000002", "status": "reported_succeeded", "outcome_verified": False}
     })
 
     result = remote_tasks.execute_claimed(claimed)
@@ -84,7 +84,7 @@ def test_screenshot_requires_owner_confirmation(monkeypatch):
     reports = []
     monkeypatch.setattr(remote_tasks, "capture_screenshot", lambda path: captured.append(path))
     monkeypatch.setattr(remote_tasks, "_post", lambda creds, path, payload: reports.append(payload) or {
-        "task": {"status": "reported_failed", "outcome_verified": False}
+        "task": {"task_id": "00000000-0000-0000-0000-000000000002", "status": "reported_failed", "outcome_verified": False}
     })
 
     result = remote_tasks.execute_claimed(claimed)
@@ -100,7 +100,7 @@ def test_screenshot_executes_only_with_owner_confirmation(monkeypatch):
     captured = []
     monkeypatch.setattr(remote_tasks, "capture_screenshot", lambda path: captured.append(path))
     monkeypatch.setattr(remote_tasks, "_post", lambda creds, path, payload: {
-        "task": {"status": "reported_succeeded", "outcome_verified": False}
+        "task": {"task_id": "00000000-0000-0000-0000-000000000002", "status": "reported_succeeded", "outcome_verified": False}
     })
 
     result = remote_tasks.execute_claimed(claimed)
@@ -114,7 +114,7 @@ def test_ungranted_scope_is_rejected_before_action(monkeypatch):
     launched = []
     monkeypatch.setattr(remote_tasks, "launch_app", lambda alias: launched.append(alias))
     monkeypatch.setattr(remote_tasks, "_post", lambda creds, path, payload: {
-        "task": {"status": "reported_failed", "outcome_verified": False}
+        "task": {"task_id": "00000000-0000-0000-0000-000000000002", "status": "reported_failed", "outcome_verified": False}
     })
 
     result = remote_tasks.execute_claimed(claimed)
@@ -128,7 +128,7 @@ def test_unknown_action_is_never_executed(monkeypatch):
     launched = []
     monkeypatch.setattr(remote_tasks, "launch_app", lambda alias: launched.append(alias))
     monkeypatch.setattr(remote_tasks, "_post", lambda creds, path, payload: {
-        "task": {"status": "reported_failed", "outcome_verified": False}
+        "task": {"task_id": "00000000-0000-0000-0000-000000000002", "status": "reported_failed", "outcome_verified": False}
     })
 
     result = remote_tasks.execute_claimed(claimed)
@@ -234,3 +234,43 @@ def test_task_for_different_device_is_rejected_before_action(monkeypatch):
         remote_tasks.execute_claimed(claimed)
 
     assert launched == []
+
+
+@pytest.mark.parametrize(
+    "reported_task",
+    [
+        {
+            "task_id": "00000000-0000-0000-0000-000000000099",
+            "status": "reported_succeeded",
+            "outcome_verified": False,
+        },
+        {
+            "task_id": "00000000-0000-0000-0000-000000000002",
+            "status": "reported_failed",
+            "outcome_verified": False,
+        },
+        {
+            "task_id": "00000000-0000-0000-0000-000000000002",
+            "status": "reported_succeeded",
+            "outcome_verified": True,
+        },
+        {
+            "task_id": "00000000-0000-0000-0000-000000000002",
+            "status": "reported_succeeded",
+        },
+    ],
+)
+def test_completion_response_must_match_task_identity_and_outcome(monkeypatch, reported_task):
+    claimed = _claimed()
+    launched = []
+    monkeypatch.setattr(remote_tasks, "launch_app", lambda alias: launched.append(alias))
+    monkeypatch.setattr(
+        remote_tasks,
+        "_post",
+        lambda *_args, **_kwargs: {"task": reported_task},
+    )
+
+    with pytest.raises(remote_tasks.HubClientError, match="unexpected device task outcome"):
+        remote_tasks.execute_claimed(claimed)
+
+    assert launched == ["notepad"]
