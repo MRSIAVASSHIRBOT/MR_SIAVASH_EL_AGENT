@@ -2,7 +2,7 @@
 
 **Personal Digital Operator — Windows desktop + Android companion preview**
 
-A device-side companion for the MR_SIAVASH ecosystem. Windows provides the local API, CLI, and desktop control center. The Android native companion adds owner-initiated Hub pairing, encrypted device credentials, periodic heartbeat, and explicit local ChatGPT/browser launch.
+A device-side companion for the MR_SIAVASH ecosystem. Windows provides the local API, CLI, desktop control center, and a draft outbound Hub task consumer. The Android companion adds owner-initiated Hub pairing, encrypted credentials, periodic heartbeat, a locally validated AI planner using configured free providers, optional offline models, and a foreground-only owner-approved Hub app-launch consumer. Hub Staging and physical-device acceptance remain pending.
 
 ## What works in this MVP
 
@@ -107,7 +107,7 @@ Quick setup check:
 
 The wake word «سیا» and optional cloud reasoning remain later phases.
 
-## Pair with MR_SIAVASH_HUB_AI (heartbeat scope only)
+## Pair with MR_SIAVASH_HUB_AI (least-privilege device scopes)
 
 The Hub API must be deployed and reachable over HTTPS (HTTP is accepted only for localhost). Pairing is owner-initiated and the one-time code expires after five minutes.
 
@@ -127,6 +127,9 @@ The Hub API must be deployed and reachable over HTTPS (HTTP is accepted only for
          platform = "windows"
          label = "Windows personal assistant"
          advertised_capabilities = @("device.heartbeat", "screen.capture", "app.launch")
+         # Heartbeat-only is the least-privilege default. Add app.launch only when
+         # the owner explicitly wants Hub app-launch tasks. Add screen.capture
+         # only when explicitly required; every screenshot task still needs confirmation.
          scopes = @("device.heartbeat")
        } | ConvertTo-Json
        $Challenge = Invoke-RestMethod -Uri "$HubUrl/devices/pairing-challenges" -Method Post -Headers @{ Authorization = "Bearer $env:MRHUB_OWNER_TOKEN" } -ContentType "application/json" -Body $Payload
