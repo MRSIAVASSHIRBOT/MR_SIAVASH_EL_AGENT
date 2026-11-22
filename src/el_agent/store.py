@@ -56,6 +56,7 @@ class TaskStore:
     def _connect(self) -> sqlite3.Connection:
         db = sqlite3.connect(self.path, timeout=10)
         db.row_factory = sqlite3.Row
+        db.execute("PRAGMA foreign_keys = ON")
         return db
 
     def create_launch(
