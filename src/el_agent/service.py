@@ -44,11 +44,18 @@ async def scheduler_loop(store: TaskStore) -> None:
                     # will classify the outcome as unknown rather than replay it.
                     raise
                 except Exception as exc:
-                    logger.exception("Scheduled task failed: %s", task["task_id"])
+                    # Exception messages can contain usernames, local paths, or
+                    # provider details. Persist only a stable class label and a
+                    # generic description; never expose raw exception text.
+                    logger.warning(
+                        "Scheduled task failed; task_id=%s error_type=%s",
+                        task["task_id"],
+                        type(exc).__name__,
+                    )
                     await asyncio.to_thread(
                         store.finish,
                         task["task_id"],
-                        type(exc).__name__ + ": " + str(exc),
+                        type(exc).__name__ + ": scheduled action failed",
                     )
         except asyncio.CancelledError:
             raise
