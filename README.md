@@ -4,7 +4,7 @@
 
 **Operational capabilities:** [AWI, GPI, CGI, PAIOS, gap detection, planning, self-evaluation, quality and security requirements](docs/OPERATIONAL_CAPABILITIES.md).
 
-A device-side companion for the MR_SIAVASH ecosystem. Windows provides the local API, CLI, and desktop control center. The Android native companion adds owner-initiated Hub pairing, encrypted device credentials, periodic heartbeat, and explicit local ChatGPT/browser launch.
+A device-side companion for the MR_SIAVASH ecosystem. Windows provides the local API, CLI, desktop control center, and a draft outbound Hub task consumer. The Android companion adds owner-initiated Hub pairing, encrypted credentials, periodic heartbeat, a locally validated AI planner using configured free providers, optional offline models, and a foreground-only owner-approved Hub app-launch consumer. Hub Staging and physical-device acceptance remain pending.
 
 ## What works in this MVP
 
@@ -109,7 +109,7 @@ Quick setup check:
 
 The wake word «سیا» and optional cloud reasoning remain later phases.
 
-## Pair with MR_SIAVASH_HUB_AI (heartbeat scope only)
+## Pair with MR_SIAVASH_HUB_AI (least-privilege device scopes)
 
 The Hub API must be deployed and reachable over HTTPS (HTTP is accepted only for localhost). Pairing is owner-initiated and the one-time code expires after five minutes.
 
@@ -129,6 +129,9 @@ The Hub API must be deployed and reachable over HTTPS (HTTP is accepted only for
          platform = "windows"
          label = "Windows personal assistant"
          advertised_capabilities = @("device.heartbeat", "screen.capture", "app.launch")
+         # Heartbeat-only is the least-privilege default. Add app.launch only when
+         # the owner explicitly wants Hub app-launch tasks. Add screen.capture
+         # only when explicitly required; every screenshot task still needs confirmation.
          scopes = @("device.heartbeat")
        } | ConvertTo-Json
        $Challenge = Invoke-RestMethod -Uri "$HubUrl/devices/pairing-challenges" -Method Post -Headers @{ Authorization = "Bearer $env:MRHUB_OWNER_TOKEN" } -ContentType "application/json" -Body $Payload
@@ -141,7 +144,7 @@ The Hub API must be deployed and reachable over HTTPS (HTTP is accepted only for
 
        .\.venv\Scripts\el-agent.exe hub-status
 
-Once paired, the local Agent sends a minimal heartbeat when its API starts. Only the device ID, agent version, runtime state, and uptime are sent. The first release does not accept remote tasks or access screenshots/files through Hub.
+Once paired, the local Agent sends minimal heartbeat metadata and can poll the Hub task queue in the Windows draft consumer. The Android draft consumer claims tasks only after an explicit foreground tap; every supported app.launch requires an on-device approve/reject dialog. Android accepts only ChatGPT/browser aliases and never accepts remote screenshots or background launches. Both consumers require a deployed Hub API, live Staging round-trip, and physical-device acceptance.
 
 To disconnect, run el-agent unpair to remove local credentials, then revoke the device from the Hub owner device registry using DELETE /devices/{device_id}. Local unpairing alone does not revoke the Hub-side device record. If you later need to pair this installation again after revocation, run el-agent reset-device-id and type RESET; this creates a new device identity without changing any existing Hub audit history.
 
@@ -157,7 +160,7 @@ This startup option runs the loopback-only API in the background; it does not en
 
 ## Security boundaries
 
-- The local API is loopback-only; no inbound remote-control transport or remote task dispatch is implemented. Optional outbound Hub heartbeat is limited to minimal device health metadata.
+- The local API is loopback-only; no inbound remote-control transport is exposed. Optional Hub task consumption is outbound-only, owner-scoped, capability-limited, and gated on Hub deployment and physical-device acceptance.
 - Every control endpoint requires bearer authentication.
 - Screenshot capture is explicit and files remain on the local device.
 - Application launch is restricted to fixed aliases; no arbitrary shell, script, executable path, arguments, or caller-supplied URL is executed.
@@ -167,15 +170,22 @@ This startup option runs the loopback-only API in the background; it does not en
 
 ## Android companion preview
 
-The native Android project is in `android/`. It currently supports:
-- Stable per-installation device identity.
-- Android Keystore AES-GCM encryption for locally stored Hub credentials.
-- Owner-initiated pairing using a short-lived code created in Hub; the owner chooses the granted scopes.
-- HTTPS-only Hub communication, short-lived access token refresh, and an on-demand heartbeat.
-- A WorkManager heartbeat constrained to an available network (Android may defer periodic work according to OS battery policy).
-- Explicit local launch of the installed ChatGPT app, with the official ChatGPT website as fallback, and a default-browser launch.
+The native Android project is in `android/`. It adds stable per-installation identity, Android Keystore AES-GCM credential storage, owner-initiated Hub pairing, HTTPS-only Hub communication, short-lived token refresh, a WorkManager heartbeat, and explicit local ChatGPT/browser launch.
 
-The Android preview includes a foreground, button-initiated, on-device push-to-talk prototype on Android 12+ when the device provides an offline recognizer and Persian language support. Microphone permission is requested at runtime; each capture is limited to 15 seconds and listening stops when the activity leaves the foreground. It never falls back to cloud recognition. Only the fixed ChatGPT/browser aliases are executable. The Android preview does **not** yet provide screen capture, arbitrary app control, remote task dispatch, background UI launching, or shared memory. The current Hub task-dispatch API is still being developed separately; the Android client intentionally does not pretend that remote tasks are available yet.
+### Planner and local models
+
+- The AI Planner creates bounded typed plans and validates every proposed operation on-device before an execution session is created.
+- The zero-cost-first online provider chain is Google Gemini API Free tier (`gemini-4-hydrogen`) followed by OpenRouter's free-model router (`openrouter/free`). Only locally saved keys are used; there is no paid-provider fallback, automatic upgrade, or credit purchase. The Google project must remain on the Free tier with billing disabled; the app cannot inspect billing settings. Provider quotas and privacy terms can change, and free-tier prompts may be used to improve provider services. Do not submit sensitive information.
+- Each execution step requires a separate owner confirmation and passes the Android capability policy. External intents remain pending until the owner returns and acknowledges the result; selected documents are read only after the Android system picker grants read access.
+- Optional offline Whisper and GGUF models can be imported from an owner-selected file into app-private storage. The importer enforces file-size bounds and container magic, but these structural checks are not a cryptographic authenticity guarantee. Use only model files from trusted sources.
+- Planner requests contain only the typed text prompt. Files, microphone audio, screenshots, Hub credentials, and local memory are excluded.
+
+### Voice and Hub task boundaries
+
+- Push-to-talk uses the device's on-device recognizer where supported; microphone permission is requested at runtime, each capture is bounded, and listening stops when the activity leaves the foreground. There is no always-on wake-word detection or cloud speech fallback.
+- A recognized call command only opens a confirmation dialog. A separate tap on **تماس** and Android's `CALL_PHONE` runtime permission are required before a call to the owner-selected contact can start.
+- Android can manually claim a Hub `app.launch` task from the Tools screen while the app is in the foreground. Each launch requires an explicit approve/reject dialog and supports only ChatGPT/browser. Android does **not** support remote screenshots, arbitrary app control, unattended background task execution, or shared memory.
+- Physical-device acceptance, Hub Staging round-trip, and revocation/expiry acceptance remain pending.
 
 Build a debug APK:
 ```bash
@@ -192,4 +202,4 @@ See docs/ROADMAP.md and docs/SECURITY.md. CI tests Windows and Linux with Python
 
 ## Status
 
-Windows version 0.2.0 provides owner-initiated Hub pairing, rotating scoped device credentials, and outbound heartbeat. Android companion preview 0.3.0 adds native pairing, encrypted credential storage, periodic heartbeat, and explicit local app launch. A clean Windows 11 installation and live screenshot/application-launch acceptance test are still required before calling desktop behavior verified. The scheduled ChatGPT shortcut opens ChatGPT only; sending prompts or automating a conversation is not implemented. Remote task dispatch, shared memory, browser extension, and cloud scheduling remain planned.
+Windows version 0.2.0 provides owner-initiated Hub pairing, rotating scoped device credentials, local-first text inference, and push-to-talk. Android companion preview 0.5.0 adds a reviewed AI planner, optional offline models, explicit call confirmation, and a foreground-only Hub app.launch consumer. The Android stack and Windows Hub task consumer remain draft changes pending Staging and physical-device acceptance. A clean Windows 11 installation and live screenshot/application-launch acceptance test are also pending. The scheduled ChatGPT shortcut opens ChatGPT only; it does not send prompts or automate a conversation. Shared memory, browser extension, and cloud scheduling remain planned.

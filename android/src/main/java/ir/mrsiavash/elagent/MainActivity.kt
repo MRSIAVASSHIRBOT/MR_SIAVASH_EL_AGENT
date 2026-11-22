@@ -2,13 +2,18 @@ package ir.mrsiavash.elagent
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.SystemClock
 import android.content.pm.PackageManager
 import android.os.Build
+import android.provider.ContactsContract
 import android.view.ViewGroup
 import android.widget.Button
 import android.text.InputType
@@ -21,57 +26,170 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import java.time.Instant
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 class MainActivity : Activity() {
     private val executor = Executors.newSingleThreadExecutor()
+    private val plannerExecutor = Executors.newSingleThreadExecutor()
     private lateinit var store: SecureStore
     private lateinit var status: TextView
+    private lateinit var fatherContactStatus: TextView
     private lateinit var hubUrl: EditText
     private lateinit var pairingCode: EditText
     private lateinit var voiceController: LocalVoiceController
     private lateinit var voiceButton: Button
+    private lateinit var taskButton: Button
     private var voiceActive = false
     private val recordAudioRequest = 4102
+    private val fatherContactRequest = 4105
+    private val callPhoneRequest = 4106
+    private var pendingCallAfterContactSelection = false
+    private var pendingCallAfterPermission = false
+    private val openDocumentRequest = 4103
+    private lateinit var documentPreview: TextView
+    private lateinit var plannerRequest: EditText
+    private lateinit var plannerButton: Button
+    private lateinit var plannerOutput: TextView
+    private lateinit var executionStatus: TextView
+    private lateinit var executionNextButton: Button
+    private lateinit var executionVerifyButton: Button
+    private var executionSession: AgentPlanExecutionSession? = null
+    private var plannerFailureMessage: String? = "هنوز طرحی ساخته نشده است."
+    private var pendingDocumentStepId: String? = null
+    private var activityInForeground = false
+    private val executionDocumentRequest = 4104
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         store = SecureStore(this)
-        val root = LinearLayout(this).apply {
+        val shell = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.rgb(7, 19, 15))
-            setPadding(28, 36, 28, 28)
+            setBackgroundColor(Color.rgb(10, 14, 22))
         }
-        val scroll = ScrollView(this).apply { addView(root) }
-        setContentView(scroll)
+        val pageHost = android.widget.FrameLayout(this)
+        fun createPage(): Pair<ScrollView, LinearLayout> {
+            val content = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                val density = resources.displayMetrics.density
+            setPadding((22 * density).toInt(), (28 * density).toInt(), (22 * density).toInt(), (28 * density).toInt())
+                setBackgroundColor(Color.rgb(13, 19, 30))
+            }
+            val page = ScrollView(this).apply {
+                isFillViewport = true
+                addView(content)
+            }
+            pageHost.addView(page, android.widget.FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+            ))
+            return page to content
+        }
+        val (homePage, homeContent) = createPage()
+        val (aiPage, aiContent) = createPage()
+        val (toolsPage, toolsContent) = createPage()
+        val (settingsPage, settingsContent) = createPage()
+        val pages = listOf(homePage, aiPage, toolsPage, settingsPage)
+        val navigation = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(8, 8, 8, 12)
+            setBackgroundColor(Color.rgb(18, 25, 38))
+        }
+        val navigationButtons = mutableListOf<Button>()
+        fun selectPage(index: Int) {
+            pages.forEachIndexed { pageIndex, page ->
+                page.visibility = if (pageIndex == index) ViewGroup.VISIBLE else ViewGroup.GONE
+            }
+            navigationButtons.forEachIndexed { buttonIndex, button ->
+                val selected = buttonIndex == index
+                button.background = GradientDrawable(
+                    GradientDrawable.Orientation.TOP_BOTTOM,
+                    intArrayOf(if (selected) Color.rgb(54, 135, 123) else Color.rgb(26, 34, 49),
+                        if (selected) Color.rgb(37, 91, 92) else Color.rgb(20, 27, 40))
+                ).apply { cornerRadius = (10 * resources.displayMetrics.density) }
+                button.setTextColor(if (selected) Color.rgb(225, 246, 242) else Color.rgb(155, 170, 190))
+                button.elevation = (if (selected) 2 else 0) * resources.displayMetrics.density
+            }
+        }
+        listOf("خانه", "هوش مصنوعی", "ابزارها", "اتصال").forEachIndexed { index, label ->
+            val button = Button(this).apply {
+                text = label
+                textSize = 12f
+                isAllCaps = false
+                val density = resources.displayMetrics.density
+                setPadding((4 * density).toInt(), (8 * density).toInt(), (4 * density).toInt(), (8 * density).toInt())
+                minimumHeight = (48 * density).toInt()
+                tag = "navigation"
+                setOnClickListener { selectPage(index) }
+            }
+            navigationButtons += button
+            navigation.addView(button, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        }
+        shell.addView(pageHost, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
+        ))
+        shell.addView(navigation, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ))
+        setContentView(shell)
+        selectPage(0)
+        var root: LinearLayout = homeContent
+        homeContent.addView(TextView(this).apply {
+            text = "دستیار شخصی هوشمند"
+            textSize = 26f
+            setTextColor(Color.rgb(242, 246, 252))
+        }, fieldParams())
+        homeContent.addView(TextView(this).apply {
+            text = "MR SIAVASH EL AGENT  ·  کنترل‌پنل Android"
+            textSize = 13f
+            setTextColor(Color.rgb(95, 202, 176))
+        }, fieldParams())
 
         root.addView(TextView(this).apply {
             text = "MR SIAVASH EL AGENT"
             textSize = 24f
-            setTextColor(Color.rgb(232, 245, 239))
+            setTextColor(Color.rgb(232, 238, 248))
         })
         root.addView(TextView(this).apply {
-            text = "Android companion · v0.3.0"
+            text = "Android companion · v0.6.0"
             textSize = 14f
-            setTextColor(Color.rgb(168, 196, 183))
+            setTextColor(Color.rgb(161, 174, 195))
         })
         root.addView(TextView(this).apply {
             text = "Device ID: ${store.deviceId()}"
             textSize = 12f
-            setTextColor(Color.rgb(53, 214, 160))
+            setTextColor(Color.rgb(104, 196, 218))
             setTextIsSelectable(true)
-        })
+        }, fieldParams())
+        root = settingsContent
+        root.addView(TextView(this).apply {
+            text = "اتصال دستگاه و مخاطب سریع"
+            textSize = 19f
+            setTextColor(Color.rgb(95, 202, 176))
+        }, fieldParams())
+        root.addView(Button(this).apply {
+            text = "انتخاب مخاطب پدر از مخاطبین گوشی"
+            isAllCaps = false
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(37, 52, 72))
+            setTextColor(Color.rgb(232, 242, 250))
+            setOnClickListener { chooseFatherContact() }
+        }, buttonParams())
+        fatherContactStatus = TextView(this).apply {
+            text = fatherContactSummary()
+            textSize = 13f
+            setTextColor(Color.rgb(188, 200, 216))
+        }
+        root.addView(fatherContactStatus, fieldParams())
         hubUrl = EditText(this).apply {
             hint = "Hub HTTPS address (https://...)"
             setTextColor(Color.WHITE)
-            setHintTextColor(Color.rgb(145, 170, 158))
+            setHintTextColor(Color.rgb(142, 158, 180))
             setSingleLine(true)
         }
         pairingCode = EditText(this).apply {
             hint = "One-time pairing code"
             setTextColor(Color.WHITE)
-            setHintTextColor(Color.rgb(145, 170, 158))
+            setHintTextColor(Color.rgb(142, 158, 180))
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
             setSingleLine(true)
         }
@@ -79,7 +197,7 @@ class MainActivity : Activity() {
         root.addView(pairingCode, fieldParams())
         root.addView(Button(this).apply {
             text = "Pair with Hub"
-            backgroundTintList = ColorStateList.valueOf(Color.rgb(19, 185, 129))
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(62, 186, 154))
             setTextColor(Color.BLACK)
             setOnClickListener {
                 val url = hubUrl.text.toString()
@@ -94,7 +212,7 @@ class MainActivity : Activity() {
         }, buttonParams())
         root.addView(Button(this).apply {
             text = "Send heartbeat now"
-            backgroundTintList = ColorStateList.valueOf(Color.rgb(19, 185, 129))
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(62, 186, 154))
             setTextColor(Color.BLACK)
             setOnClickListener {
                 setBusy("Contacting Hub…")
@@ -105,17 +223,81 @@ class MainActivity : Activity() {
                 }
             }
         }, buttonParams())
+        taskButton = Button(this).apply {
+            text = "Check Hub tasks"
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(27, 35, 50))
+            setTextColor(Color.rgb(104, 196, 218))
+            setOnClickListener {
+                val hub = HubClient(store)
+                if (!hub.isPaired()) {
+                    setStatus("ابتدا دستگاه را با Hub جفت کن.")
+                    return@setOnClickListener
+                }
+                isEnabled = false
+                setBusy("Checking for one owner-authorized task…")
+                executor.execute {
+                    val result = runCatching { hub.claimTask() }
+                    runOnUiThread {
+                        taskButton.isEnabled = true
+                        result.onSuccess { claim ->
+                            if (!hub.isPaired()) {
+                                setStatus("Device was unpaired while checking Hub tasks. No approval will be shown; Hub will expire any unreported lease.")
+                            } else if (claim == null) {
+                                setStatus("No supported app.launch task is queued, or an unsupported task was safely rejected.")
+                            } else {
+                                showTaskApproval(claim)
+                            }
+                        }.onFailure { error ->
+                            setStatus(error.message ?: "Could not check Hub tasks.")
+                        }
+                    }
+                }
+            }
+        }
+        root.addView(taskButton, buttonParams())
+        root = homeContent
         voiceButton = Button(this).apply {
-            text = "شروع فرمان صوتی (محلی)"
-            backgroundTintList = ColorStateList.valueOf(Color.rgb(19, 185, 129))
+            text = "🎙  صحبت با سیا"
+            textSize = 18f
+            isAllCaps = false
+            minHeight = 72
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(62, 186, 154))
             setTextColor(Color.BLACK)
             setOnClickListener { toggleVoice() }
         }
         root.addView(voiceButton, buttonParams())
         root.addView(Button(this).apply {
+            text = "📞  تماس سریع با پدر"
+            textSize = 15f
+            isAllCaps = false
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(35, 46, 63))
+            setTextColor(Color.rgb(95, 202, 176))
+            setOnClickListener { placeFatherCall() }
+        }, buttonParams())
+        root.addView(TextView(this).apply {
+            text = "برای فرمان صوتی، دکمه را بزن و بعد از شنیدن صدای آماده‌باش صحبت کن. تشخیص گفتار فعلاً با موتور آفلاین Android انجام می‌شود."
+            textSize = 12f
+            setTextColor(Color.rgb(172, 186, 202))
+        }, fieldParams())
+        root = toolsContent
+        root.addView(TextView(this).apply {
+            text = "ابزارهای دستگاه"
+            textSize = 21f
+            setTextColor(Color.rgb(95, 202, 176))
+        }, fieldParams())
+        root.addView(Button(this).apply {
+            text = "مدیریت مدل‌های آفلاین · Whisper و LLM"
+            isAllCaps = false
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(37, 52, 72))
+            setTextColor(Color.rgb(232, 242, 250))
+            setOnClickListener {
+                startActivity(Intent(this@MainActivity, OfflineModelsActivity::class.java))
+            }
+        }, buttonParams())
+        root.addView(Button(this).apply {
             text = "Open ChatGPT"
-            backgroundTintList = ColorStateList.valueOf(Color.rgb(13, 33, 25))
-            setTextColor(Color.rgb(53, 214, 160))
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(27, 35, 50))
+            setTextColor(Color.rgb(104, 196, 218))
             setOnClickListener {
                 runCatching { launchAllowlisted("chatgpt") }
                     .onFailure { setStatus(it.message ?: "Could not open ChatGPT.") }
@@ -123,32 +305,667 @@ class MainActivity : Activity() {
         }, buttonParams())
         root.addView(Button(this).apply {
             text = "Open browser"
-            backgroundTintList = ColorStateList.valueOf(Color.rgb(13, 33, 25))
-            setTextColor(Color.rgb(53, 214, 160))
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(27, 35, 50))
+            setTextColor(Color.rgb(104, 196, 218))
             setOnClickListener {
                 runCatching { launchAllowlisted("browser") }
                     .onFailure { setStatus(it.message ?: "Could not open browser.") }
             }
         }, buttonParams())
         root.addView(Button(this).apply {
-            text = "Unpair locally"
-            backgroundTintList = ColorStateList.valueOf(Color.rgb(74, 36, 31))
-            setTextColor(Color.rgb(255, 220, 210))
+            text = "انتخاب و پیش‌نمایش فایل متنی"
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(27, 35, 50))
+            setTextColor(Color.rgb(104, 196, 218))
             setOnClickListener {
-                store.clearCredentialsPreservingIdentity()
-                WorkManager.getInstance(this@MainActivity).cancelUniqueWork("el-agent-heartbeat")
-                setStatus("Local credentials cleared. Revoke the device in Hub to fully disconnect.")
+                runCatching {
+                    startActivityForResult(AndroidDocumentAccess.createOpenDocumentIntent(), openDocumentRequest)
+                }.onFailure { setStatus(it.message ?: "بازکردن انتخاب‌گر فایل ناموفق بود.") }
             }
         }, buttonParams())
-        status = TextView(this).apply { text = "Not connected"; textSize = 14f; setTextColor(Color.rgb(168, 196, 183)) }
+        documentPreview = TextView(this).apply {
+            text = "فایل فقط پس از انتخاب مستقیم شما خوانده می‌شود. پیش‌نمایش متنی حداکثر ۶۴ کیلوبایت است و به Cloud ارسال نمی‌شود."
+            textSize = 13f
+            setTextColor(Color.rgb(214, 225, 238))
+            setTextIsSelectable(true)
+        }
+        root.addView(documentPreview, fieldParams())
+        root = aiContent
+        root.addView(TextView(this).apply {
+            text = "هوش مصنوعی و برنامه‌ریز"
+            textSize = 21f
+            setTextColor(Color.rgb(95, 202, 176))
+        }, fieldParams())
+        root.addView(TextView(this).apply {
+            text = "برنامه‌ریز هوشمند · تبدیل درخواست به مراحل ساختاریافته"
+            textSize = 17f
+            setTextColor(Color.rgb(104, 196, 218))
+        }, fieldParams())
+        root.addView(TextView(this).apply {
+            text = "ارائه‌دهنده‌های رایگان · Gemini سپس OpenRouter"
+            textSize = 14f
+            setTextColor(Color.rgb(232, 238, 248))
+        }, fieldParams())
+        root.addView(TextView(this).apply {
+            text = "کلید هر سرویس اختیاری است و فقط در محفظهٔ رمزگذاری‌شدهٔ Android ذخیره می‌شود. برنامه فقط بین مسیرهای رایگان جابه‌جا می‌شود و هیچ مسیر پولی یا ارتقای خودکاری ندارد. در صورت خطا، متن درخواست ممکن است برای سرویس بعدی هم ارسال شود؛ اطلاعات حساس وارد نکنید. رایگان‌بودن Gemini به Tier پروژه بستگی دارد؛ برنامه وضعیت Billing حساب را نمی‌تواند تشخیص دهد. برای تضمین هزینهٔ صفر، پروژهٔ Gemini باید Free Tier و بدون Billing فعال باشد."
+            textSize = 12f
+            setTextColor(Color.rgb(185, 198, 216))
+        }, fieldParams())
+        addFreeProviderKeyEditor(root, "gemini", "Google Gemini")
+        addFreeProviderKeyEditor(root, "openrouter", "OpenRouter")
+        root.addView(TextView(this).apply {
+            text = "مدل‌های پیش‌فرض: gemini-4-hydrogen · openrouter/free. کلید قدیمی OpenAI حذف نمی‌شود، اما برنامه‌ریز رایگان از آن استفاده نمی‌کند."
+            textSize = 12f
+            setTextColor(Color.rgb(185, 198, 216))
+        }, fieldParams())
+        root.addView(TextView(this).apply {
+            text = "فقط درخواست متنی واردشده به برنامه‌ریز ارسال می‌شود؛ فایل، تصویر، صدای میکروفون، اسکرین‌شات و حافظهٔ محلی ارسال نمی‌شوند. طرح خروجی پیش از نمایش، محلی اعتبارسنجی می‌شود."
+            textSize = 12f
+            setTextColor(Color.rgb(185, 198, 216))
+        }, fieldParams())
+        plannerRequest = EditText(this).apply {
+            hint = "درخواستت را بنویس؛ مثلاً: مرورگر را باز کن و این صفحه را نمایش بده."
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.rgb(142, 158, 180))
+            minLines = 3
+            maxLines = 5
+        }
+        root.addView(plannerRequest, fieldParams())
+        plannerButton = Button(this).apply {
+            text = "ساخت برنامهٔ اجرایی (بدون اجرا)"
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(62, 186, 154))
+            setTextColor(Color.BLACK)
+            setOnClickListener { generatePlan() }
+        }
+        root.addView(plannerButton, buttonParams())
+        plannerOutput = TextView(this).apply {
+            text = "طرح ساخته‌شده اینجا نمایش داده می‌شود. هیچ مرحله‌ای صرفاً با تولید طرح اجرا نخواهد شد."
+            textSize = 14f
+            setTextColor(Color.rgb(232, 238, 248))
+            setTextIsSelectable(true)
+        }
+        root.addView(plannerOutput, fieldParams())
+        executionStatus = TextView(this).apply {
+            text = "پس از تولید طرح، هر مرحله با تأیید جداگانهٔ شما اجرا می‌شود."
+            textSize = 13f
+            setTextColor(Color.rgb(185, 198, 216))
+            setTextIsSelectable(true)
+        }
+        root.addView(executionStatus, fieldParams())
+        executionNextButton = Button(this).apply {
+            text = "بررسی و اجرای مرحلهٔ بعد"
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(62, 186, 154))
+            setTextColor(Color.BLACK)
+            visibility = ViewGroup.GONE
+            setOnClickListener { confirmNextPlanStep() }
+        }
+        root.addView(executionNextButton, buttonParams())
+        executionVerifyButton = Button(this).apply {
+            text = "نتیجه را بررسی کردم؛ تکمیل مرحله"
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(27, 35, 50))
+            setTextColor(Color.rgb(104, 196, 218))
+            visibility = ViewGroup.GONE
+            setOnClickListener { confirmDispatchedStepCompletion() }
+        }
+        root.addView(executionVerifyButton, buttonParams())
+        root = settingsContent
+        root.addView(TextView(this).apply {
+            text = "اتصال به MR_SIAVASH_HUB_AI"
+            textSize = 19f
+            setTextColor(Color.rgb(95, 202, 176))
+        }, fieldParams())
+        root.addView(Button(this).apply {
+            text = "Unpair locally"
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(69, 38, 48))
+            setTextColor(Color.rgb(255, 224, 231))
+            setOnClickListener { view ->
+                HubCredentialLock.requestUnpair()
+                val unpairButton = view as Button
+                unpairButton.isEnabled = false
+                setBusy("Unpairing from Hub on this device…")
+                executor.execute {
+                    val result = runCatching { HubClient(store).unpairLocally(requestAlreadyMarked = true) }
+                    runOnUiThread {
+                        unpairButton.isEnabled = true
+                        result.onSuccess {
+                            WorkManager.getInstance(this@MainActivity).cancelUniqueWork("el-agent-heartbeat")
+                            setStatus("Local credentials cleared. Revoke the device in Hub to fully disconnect.")
+                        }.onFailure { error ->
+                            setStatus(error.message ?: "Local unpair failed; credentials were preserved.")
+                        }
+                    }
+                }
+            }
+        }, buttonParams())
+        root = homeContent
+        status = TextView(this).apply {
+            text = "آماده‌به‌کار · منتظر فرمان شما"
+            textSize = 14f
+            setTextColor(Color.rgb(161, 174, 195))
+            val density = resources.displayMetrics.density
+            setPadding((16 * density).toInt(), (14 * density).toInt(), (16 * density).toInt(), (14 * density).toInt())
+            background = GradientDrawable().apply {
+                setColor(Color.rgb(23, 32, 47))
+                cornerRadius = (18 * density)
+                setStroke((1 * density).toInt(), Color.rgb(40, 53, 73))
+            }
+        }
         root.addView(status, fieldParams())
         voiceController = LocalVoiceController(this, ::setStatus, ::handleVoiceTranscript, ::finishVoiceUi)
         if (HubClient(store).isPaired()) {
             setStatus("Paired with Hub. Periodic heartbeat is scheduled.")
             scheduleHeartbeat()
         }
+        applyVisualRefresh(shell)
+        selectPage(0)
     }
 
+    private fun applyVisualRefresh(root: android.view.ViewGroup) {
+        val scale = resources.displayMetrics.density
+        fun dp(value: Int) = (value * scale).toInt()
+        fun walk(group: android.view.ViewGroup) {
+            for (i in 0 until group.childCount) {
+                val view = group.getChildAt(i)
+                when (view) {
+                    is Button -> {
+                        if (view.tag == "navigation") continue
+                        val label = view.text?.toString().orEmpty()
+                        val isPrimary = label.contains("🎙") || label.contains("ساخت برنامه") ||
+                            label.contains("تأیید و اجرای") || label.contains("اجرا") ||
+                            label.contains("ذخیره امن") || label.contains("Pair with Hub")
+                        val isDanger = label.contains("حذف کلید") || label.contains("Unpair")
+                        val top = when {
+                            isDanger -> Color.rgb(100, 43, 54)
+                            isPrimary -> Color.rgb(61, 177, 149)
+                            else -> Color.rgb(32, 42, 59)
+                        }
+                        val bottom = when {
+                            isDanger -> Color.rgb(65, 34, 46)
+                            isPrimary -> Color.rgb(38, 132, 125)
+                            else -> Color.rgb(24, 31, 45)
+                        }
+                        view.background = GradientDrawable(
+                            GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(top, bottom)
+                        ).apply { cornerRadius = dp(18).toFloat() }
+                        view.setTextColor(if (isPrimary) Color.rgb(8, 20, 24) else Color.rgb(229, 237, 248))
+                        view.isAllCaps = false
+                        view.textSize = if (label.contains("🎙")) 16f else 14f
+                        view.typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                        view.minimumHeight = dp(if (label.contains("🎙")) 64 else 52)
+                        view.setPadding(dp(16), dp(12), dp(16), dp(12))
+                        view.elevation = dp(2).toFloat()
+                    }
+                    is EditText -> {
+                        view.background = GradientDrawable().apply {
+                            setColor(Color.rgb(22, 29, 43))
+                            cornerRadius = dp(14).toFloat()
+                            setStroke(dp(1), Color.rgb(48, 61, 81))
+                        }
+                        view.setPadding(dp(14), dp(12), dp(14), dp(12))
+                        view.textSize = 15f
+                        view.typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+                    }
+                    is TextView -> {
+                        view.typeface = Typeface.create(
+                            if (view.textSize / scale >= 19) "sans-serif-medium" else "sans-serif",
+                            Typeface.NORMAL
+                        )
+                        view.letterSpacing = if (view.textSize / scale >= 19) 0.01f else 0f
+                    }
+                    is android.view.ViewGroup -> walk(view)
+                }
+            }
+        }
+        walk(root)
+    }
+
+    private fun generatePlan() {
+        val requestText = plannerRequest.text.toString()
+        if (requestText.isBlank() || requestText.length > 4_000) {
+            setStatus("درخواست باید بین ۱ تا ۴۰۰۰ نویسه باشد.")
+            return
+        }
+        val previous = executionSession
+        if (previous != null && !previous.isComplete()) {
+            AlertDialog.Builder(this)
+                .setTitle("جایگزینی طرح ناتمام؟")
+                .setMessage(
+                    "طرح قبلی هنوز تکمیل نشده است. ممکن است یک اقدام خارجی قبلاً به Android سپرده شده باشد. " +
+                        "جایگزینی، وضعیت تأییدنشدهٔ آن طرح را کنار می‌گذارد و هیچ اقدامی را تکرار نمی‌کند."
+                )
+                .setNegativeButton("ادامهٔ طرح قبلی", null)
+                .setPositiveButton("کنارگذاشتن و ساخت طرح جدید") { _, _ ->
+                    startPlanGeneration(requestText)
+                }
+                .show()
+        } else {
+            startPlanGeneration(requestText)
+        }
+    }
+
+    private fun startPlanGeneration(requestText: String) {
+        executionSession = null
+        pendingDocumentStepId = null
+        plannerFailureMessage = "در حال ساخت طرح؛ هنوز مرحله‌ای برای اجرا وجود ندارد."
+        updateExecutionUi()
+        plannerButton.isEnabled = false
+        plannerOutput.text = "در حال ساخت طرح ساختاریافته با سرویس‌های رایگان…"
+        setStatus("درخواست فقط به ارائه‌دهنده‌های رایگانِ دارای کلید ذخیره‌شده ارسال می‌شود.")
+        plannerExecutor.execute {
+            val result = runCatching {
+                val routed = FreeProviderPlanRouter(store).generate(
+                    AgentPlanPrompt.SYSTEM_PROMPT,
+                    AgentPlanPrompt.userMessage(requestText)
+                )
+                val plan = AgentPlanParser.parse(routed.json)
+                plan to routed
+            }
+            runOnUiThread {
+                plannerButton.isEnabled = true
+                result.onSuccess { (plan, routed) ->
+                    executionSession = if (plan.steps.isNotEmpty()) AgentPlanExecutionSession(plan) else null
+                    pendingDocumentStepId = null
+                    plannerFailureMessage = if (plan.steps.isEmpty()) {
+                        "طرح اجرایی ساخته نشد؛ مدل برای ادامه به توضیح بیشتر نیاز دارد."
+                    } else null
+                    plannerOutput.text = AgentPlanPolicy.render(plan)
+                    setStatus("طرح از " + routed.provider.label + " دریافت و محلی اعتبارسنجی شد؛ هیچ مرحله‌ای هنوز اجرا نشده است.")
+                    updateExecutionUi()
+                }.onFailure { error ->
+                    plannerFailureMessage = "طرحی برای اجرا وجود ندارد؛ ساخت طرح ناموفق بود. " +
+                        (error.message ?: "لطفاً اتصال، کلیدها و سهمیهٔ سرویس‌های رایگان را بررسی کنید.")
+                    plannerOutput.text = plannerFailureMessage
+                    setStatus("هیچ طرح معتبری تولید نشد؛ درخواست شما در کادر ورودی باقی مانده است.")
+                    updateExecutionUi()
+                }
+            }
+        }
+    }
+
+    private fun confirmNextPlanStep() {
+        val session = executionSession ?: run {
+            setStatus("ابتدا یک طرح معتبر تولید کنید.")
+            return
+        }
+        val step = session.nextRunnableStep() ?: run {
+            updateExecutionUi()
+            return
+        }
+        val position = session.plan.steps.indexOfFirst { it.id == step.id } + 1
+        val detail = describePlanStep(step)
+        AlertDialog.Builder(this)
+            .setTitle("تأیید مرحلهٔ $position از ${session.plan.steps.size}")
+            .setMessage(
+                "$detail\n\nاین اقدام فقط پس از تأیید شما آغاز می‌شود. " +
+                    "برای بازکردن وب‌سایت، مقصد در مرورگر Android باز خواهد شد. " +
+                    "برای فایل، انتخاب‌گر رسمی Android نمایش داده می‌شود."
+            )
+            .setNegativeButton("انصراف", null)
+            .setPositiveButton("تأیید و ادامه") { _, _ -> runReviewedPlanStep(session, step) }
+            .show()
+    }
+
+    private fun runReviewedPlanStep(session: AgentPlanExecutionSession, step: AgentPlanStep) {
+        val actionId = session.actionIdFor(step.id)
+        val decision = AgentPlanExecutionPolicy.evaluate(
+            step,
+            PlanPolicyContext(
+                actionId = actionId,
+                appInForeground = activityInForeground,
+                ownerConfirmed = true
+            )
+        )
+        if (!decision.allowed) {
+            setStatus("سیاست مجوز اجرای این مرحله را نپذیرفت: ${decision.reason}")
+            updateExecutionUi()
+            return
+        }
+
+        runCatching {
+            when (step.operation) {
+                AgentOperation.OPEN_APP -> {
+                    session.markDispatched(step.id)
+                    launchAllowlisted(step.target ?: throw IllegalArgumentException("App alias is missing."))
+                    setStatus("درخواست بازکردن برنامه به Android سپرده شد؛ پس از بازگشت، نتیجه را بررسی کنید.")
+                }
+                AgentOperation.OPEN_URL -> {
+                    val target = step.target ?: throw IllegalArgumentException("HTTPS destination is missing.")
+                    session.markDispatched(step.id)
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(target)))
+                    setStatus("نشانی به مرورگر Android سپرده شد؛ پس از بازگشت، نتیجه را بررسی کنید.")
+                }
+                AgentOperation.READ_SELECTED_DOCUMENT -> {
+                    session.markWaitingForResource(step.id)
+                    pendingDocumentStepId = step.id
+                    setStatus("پس از انتخاب فایل، مجوز منبع بررسی و پیش‌نمایش محلی انجام می‌شود.")
+                    startActivityForResult(
+                        AndroidDocumentAccess.createOpenDocumentIntent(),
+                        executionDocumentRequest
+                    )
+                }
+                AgentOperation.SHOW_TEXT -> {
+                    plannerOutput.text = "متن تأییدشده برای نمایش:\n\n" + (step.text ?: "")
+                    session.markCompleted(step.id, detail = "متن در برنامه نمایش داده شد.")
+                    setStatus("مرحلهٔ نمایش متن تکمیل شد.")
+                }
+            }
+        }.onFailure { error ->
+            if (pendingDocumentStepId == step.id) pendingDocumentStepId = null
+            runCatching { session.markFailed(step.id, error.message ?: "Action failed.") }
+            setStatus("اجرای مرحله ناموفق بود؛ برای جلوگیری از اجرای تکراری، ادامهٔ طرح متوقف شد.")
+        }
+        updateExecutionUi()
+    }
+
+    private fun handlePlanDocumentResult(resultCode: Int, data: Intent?) {
+        val session = executionSession
+        val stepId = pendingDocumentStepId
+        pendingDocumentStepId = null
+        if (session == null || stepId == null) {
+            setStatus("جلسهٔ اجرای فایل دیگر فعال نیست؛ هیچ فایلی خوانده نشد.")
+            updateExecutionUi()
+            return
+        }
+        if (resultCode != RESULT_OK) {
+            session.markFailed(stepId, "Document selection was cancelled.")
+            setStatus("انتخاب فایل لغو شد؛ ادامهٔ طرح متوقف شد.")
+            updateExecutionUi()
+            return
+        }
+        val uri = data?.data
+        if (uri == null) {
+            session.markFailed(stepId, "The document picker returned no resource.")
+            setStatus("انتخاب‌گر فایلی برنگرداند؛ ادامهٔ طرح متوقف شد.")
+            updateExecutionUi()
+            return
+        }
+
+        val actionId = session.actionIdFor(stepId)
+        val decision = AgentPlanExecutionPolicy.evaluate(
+            session.plan.steps.first { it.id == stepId },
+            PlanPolicyContext(
+                actionId = actionId,
+                appInForeground = activityInForeground,
+                ownerConfirmed = true,
+                resourceSelected = true
+            )
+        )
+        if (!decision.allowed) {
+            session.markFailed(stepId, decision.reason)
+            setStatus("سیاست مجوز خواندن فایل انتخاب‌شده را نپذیرفت.")
+            updateExecutionUi()
+            return
+        }
+
+        val resultFlags = data?.flags ?: 0
+        if (!DocumentAccessPolicy.hasReadPermission(resultFlags)) {
+            session.markFailed(stepId, "Android did not grant read access to the selected document.")
+            setStatus("Android مجوز خواندن فایل را صادر نکرد؛ هیچ محتوایی خوانده نشد.")
+            updateExecutionUi()
+            return
+        }
+        setBusy("در حال بررسی مجوز و خواندن فایل انتخاب‌شده به‌صورت محلی…")
+        executor.execute {
+            val readResult = runCatching {
+                val preview = AndroidDocumentAccess.readTextPreview(contentResolver, uri)
+                val persisted = runCatching {
+                    AndroidDocumentAccess.persistReadPermission(contentResolver, uri, resultFlags)
+                }.getOrDefault(false)
+                preview to persisted
+            }
+            runOnUiThread {
+                readResult.onSuccess { (preview, persisted) ->
+                    documentPreview.text =
+                        "نوع فایل: ${preview.mimeType}\nحجم خوانده‌شده: ${preview.bytesRead} بایت\n" +
+                            "دسترسی پایدار: ${if (persisted) "بله" else "خیر؛ فقط دسترسی موقت انتخاب‌گر"}\n\n" +
+                            preview.text
+                    session.markCompleted(
+                        stepId,
+                        resourceVerified = true,
+                        detail = "فایل انتخاب‌شده فقط روی دستگاه پیش‌نمایش شد."
+                    )
+                    setStatus("فایل به‌صورت محلی پیش‌نمایش شد و به Cloud ارسال نشد.")
+                }.onFailure { error ->
+                    session.markFailed(stepId, error.message ?: "Local document preview failed.")
+                    documentPreview.text = "پیش‌نمایش در دسترس نیست: ${error.message ?: "خطای نامشخص"}"
+                    setStatus("خواندن فایل ناموفق بود؛ ادامهٔ طرح متوقف شد.")
+                }
+                updateExecutionUi()
+            }
+        }
+    }
+
+    private fun confirmDispatchedStepCompletion() {
+        val session = executionSession ?: return
+        val record = session.records().firstOrNull { it.state == PlanStepState.DISPATCHED } ?: return
+        val step = session.plan.steps.first { it.id == record.stepId }
+        AlertDialog.Builder(this)
+            .setTitle("تأیید نتیجهٔ اقدام")
+            .setMessage(
+                "${describePlanStep(step)}\n\nآیا خودتان بررسی کرده‌اید که این مرحله با موفقیت انجام شده است؟ " +
+                    "تأیید شما فقط مرحلهٔ فعلی را تکمیل می‌کند."
+            )
+            .setNegativeButton("هنوز نه", null)
+            .setPositiveButton("بله، بررسی کردم") { _, _ ->
+                runCatching {
+                    session.markCompleted(step.id, ownerVerified = true, detail = "Owner verified after returning to the app.")
+                }.onSuccess {
+                    setStatus("تکمیل مرحله توسط شما تأیید شد.")
+                }.onFailure {
+                    setStatus("تأیید مرحله انجام نشد: ${it.message ?: "خطای نامشخص"}")
+                }
+                updateExecutionUi()
+            }
+            .show()
+    }
+
+    private fun describePlanStep(step: AgentPlanStep): String = when (step.operation) {
+        AgentOperation.OPEN_APP -> "بازکردن برنامهٔ مجاز: ${step.target}"
+        AgentOperation.OPEN_URL -> "بازکردن نشانی HTTPS:\n${step.target}"
+        AgentOperation.READ_SELECTED_DOCUMENT -> "بازکردن انتخاب‌گر رسمی Android برای انتخاب یک فایل متنی"
+        AgentOperation.SHOW_TEXT -> "نمایش متن:\n${step.text}"
+    }
+
+    private fun updateExecutionUi() {
+        if (!::executionStatus.isInitialized) return
+        val session = executionSession
+        if (session == null) {
+            executionStatus.text = plannerFailureMessage ?: "طرحی برای اجرا وجود ندارد."
+            executionNextButton.visibility = ViewGroup.GONE
+            executionVerifyButton.visibility = ViewGroup.GONE
+            return
+        }
+
+        val lines = session.records().mapIndexed { index, record ->
+            val stateText = when (record.state) {
+                PlanStepState.PENDING -> "در انتظار"
+                PlanStepState.WAITING_FOR_RESOURCE -> "در انتظار انتخاب منبع"
+                PlanStepState.DISPATCHED -> "منتظر تأیید نتیجه توسط شما"
+                PlanStepState.COMPLETED -> "تکمیل‌شده"
+                PlanStepState.FAILED -> "ناموفق؛ ادامه متوقف است"
+            }
+            "${index + 1}. ${record.stepId}: $stateText"
+        }
+        executionStatus.text = lines.joinToString("\n")
+        if (session.isComplete()) {
+            executionStatus.append("\n\nتمام مراحل با تأیید لازم تکمیل شدند.")
+            executionNextButton.visibility = ViewGroup.GONE
+            executionVerifyButton.visibility = ViewGroup.GONE
+            return
+        }
+
+        val dispatched = session.records().any { it.state == PlanStepState.DISPATCHED }
+        if (dispatched) {
+            executionNextButton.visibility = ViewGroup.GONE
+            executionVerifyButton.visibility = ViewGroup.VISIBLE
+            executionVerifyButton.isEnabled = activityInForeground
+            return
+        }
+        executionVerifyButton.visibility = ViewGroup.GONE
+        val next = session.nextRunnableStep()
+        if (next != null && pendingDocumentStepId == null) {
+            executionNextButton.text = "تأیید و اجرای مرحلهٔ ${session.plan.steps.indexOfFirst { it.id == next.id } + 1}"
+            executionNextButton.visibility = ViewGroup.VISIBLE
+            executionNextButton.isEnabled = activityInForeground
+        } else {
+            executionNextButton.visibility = ViewGroup.GONE
+            if (session.records().any { it.state == PlanStepState.FAILED }) {
+                executionStatus.append("\n\nبرای جلوگیری از اجرای تکراری، این طرح متوقف شده است.")
+            }
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == fatherContactRequest) {
+            val selectedUri = if (resultCode == RESULT_OK) data?.data else null
+            if (selectedUri == null) {
+                pendingCallAfterContactSelection = false
+                setStatus("انتخاب مخاطب لغو شد؛ تماسی برقرار نشد.")
+                return
+            }
+            val selected = runCatching {
+                contentResolver.query(
+                    selectedUri,
+                    arrayOf(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME, ContactsContract.CommonDataKinds.Phone.NUMBER),
+                    null, null, null
+                )?.use { cursor ->
+                    if (!cursor.moveToFirst()) null else {
+                        val name = cursor.getString(0).orEmpty().ifBlank { "پدر" }
+                        val number = cursor.getString(1).orEmpty().filter { it.isDigit() || it == '+' }
+                        if (number.length !in 3..20) null else name to number
+                    }
+                }
+            }.getOrNull()
+            if (selected == null) {
+                pendingCallAfterContactSelection = false
+                setStatus("شمارهٔ معتبر از مخاطب انتخاب‌شده دریافت نشد.")
+                return
+            }
+            store.saveFatherContact(selected.first, selected.second)
+            if (::fatherContactStatus.isInitialized) fatherContactStatus.text = fatherContactSummary()
+            val shouldCall = pendingCallAfterContactSelection
+            pendingCallAfterContactSelection = false
+            setStatus("مخاطب پدر به‌صورت رمزگذاری‌شده ذخیره شد.")
+            if (shouldCall) placeFatherCall()
+            return
+        }
+        if (requestCode == executionDocumentRequest) {
+            handlePlanDocumentResult(resultCode, data)
+            return
+        }
+        if (requestCode != openDocumentRequest || resultCode != RESULT_OK) return
+        val uri = data?.data ?: run {
+            setStatus("فایلی انتخاب نشد.")
+            return
+        }
+        val resultFlags = data?.flags ?: 0
+        setBusy("در حال خواندن فایل انتخاب‌شده به‌صورت محلی…")
+        executor.execute {
+            val result = runCatching {
+                val preview = AndroidDocumentAccess.readTextPreview(contentResolver, uri)
+                val persisted = runCatching {
+                    AndroidDocumentAccess.persistReadPermission(contentResolver, uri, resultFlags)
+                }.getOrDefault(false)
+                preview to persisted
+            }
+            runOnUiThread {
+                result.onSuccess { (preview, persisted) ->
+                    documentPreview.text = "نوع فایل: ${preview.mimeType}\nحجم خوانده‌شده: ${preview.bytesRead} بایت\nدسترسی پایدار: ${if (persisted) "بله" else "خیر؛ فقط دسترسی موقت انتخاب‌گر"}\n\n${preview.text}"
+                    setStatus("پیش‌نمایش فایل فقط روی همین دستگاه آماده شد؛ هیچ محتوایی ارسال نشد.")
+                }.onFailure { error ->
+                    documentPreview.text = "پیش‌نمایش در دسترس نیست: ${error.message ?: "خطای نامشخص"}"
+                    setStatus("خواندن فایل ناموفق بود.")
+                }
+            }
+        }
+    }
+
+    private fun showTaskApproval(claim: AndroidDeviceTaskClaim) {
+        val appName = claim.app ?: "unknown"
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Hub task requires your approval")
+            .setMessage(
+                "The Hub has requested to open '$appName' on this device. " +
+                    "Nothing will happen unless you approve this request. " +
+                    "Execution must finish within ${claim.timeoutSeconds} seconds after approval."
+            )
+            .setPositiveButton("Approve and continue") { _, _ ->
+                if (!HubClient(store).isPaired()) {
+                    setStatus("Device was unpaired before approval. No app was opened; Hub will expire the task lease.")
+                    return@setPositiveButton
+                }
+                if (!Instant.now().isBefore(claim.leaseExpiresAt)) {
+                    setStatus("The Hub task lease expired before approval. No app was opened; Hub will reconcile the outcome as unknown.")
+                    return@setPositiveButton
+                }
+                val started = SystemClock.elapsedRealtime()
+                val launchResult = runCatching {
+                    HubCredentialLock.withDeviceAction {
+                        check(HubClient(store).isPaired()) {
+                            "Device was unpaired before task execution; no app was opened."
+                        }
+                        launchAllowlisted(appName)
+                    }
+                }
+                val elapsed = SystemClock.elapsedRealtime() - started
+                if (launchResult.isSuccess) {
+                    setStatus("App launch requested. Reporting the outcome to Hub…")
+                    reportTaskOutcome(claim, true, null, elapsed)
+                } else {
+                    setStatus("This app is unavailable on Android. Reporting failure…")
+                    reportTaskOutcome(claim, false, "app_not_available", elapsed)
+                }
+            }
+            .setNegativeButton("Reject") { _, _ ->
+                setStatus("Task rejected. Reporting the decision to Hub…")
+                reportTaskOutcome(claim, false, "permission_denied", 0L)
+            }
+            .setOnCancelListener {
+                reportTaskOutcome(claim, false, "permission_denied", 0L)
+            }
+            .create()
+        dialog.show()
+    }
+
+    private fun reportTaskOutcome(
+        claim: AndroidDeviceTaskClaim,
+        succeeded: Boolean,
+        errorCode: String?,
+        durationMs: Long
+    ) {
+        if (!HubClient(store).isPaired()) {
+            setStatus("Device was unpaired before the outcome report. Hub will reconcile the lease as unknown.")
+            return
+        }
+        if (!AndroidTaskPolicy.isWithinExecutionDeadline(durationMs, claim.timeoutSeconds)) {
+            setStatus("مهلت اجرای وظیفه تمام شد؛ نتیجه نامشخص است و به Hub گزارش نمی‌شود. وظیفه دوباره اجرا نخواهد شد.")
+            return
+        }
+        if (!Instant.now().isBefore(claim.leaseExpiresAt)) {
+            setStatus("The Hub task lease expired. No outcome was replayed; Hub will reconcile it as unknown.")
+            return
+        }
+        executor.execute {
+            runCatching { HubClient(store).completeTask(claim, succeeded, errorCode, durationMs) }
+                .onSuccess {
+                    runOnUiThread {
+                        setStatus(
+                            if (succeeded) {
+                                "Hub recorded the app-launch result (device-reported, not independently verified)."
+                            } else {
+                                "Hub recorded the rejected or failed task."
+                            }
+                        )
+                    }
+                }
+                .onFailure { error ->
+                    runOnUiThread {
+                        setStatus("Could not report task outcome; Hub will expire the lease without replay: ${error.message}")
+                    }
+                }
+        }
+    }
 
     private fun toggleVoice() {
         if (voiceActive) {
@@ -171,12 +988,23 @@ class MainActivity : Activity() {
 
     private fun beginVoice() {
         voiceActive = voiceController.start()
-        voiceButton.text = if (voiceActive) "توقف فرمان صوتی" else "شروع فرمان صوتی (محلی)"
+        voiceButton.text = if (voiceActive) "توقف فرمان صوتی" else "🎙  صحبت با سیا"
         if (!voiceActive) setStatus("تشخیص گفتار محلی در دسترس نیست؛ هیچ صدایی به Cloud ارسال نشد.")
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == callPhoneRequest) {
+            val granted = grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED
+            val shouldCall = pendingCallAfterPermission
+            pendingCallAfterPermission = false
+            if (granted && shouldCall) executeFatherCall()
+            else if (!granted) {
+                setStatus("مجوز تماس تلفنی صادر نشد؛ هیچ تماسی برقرار نشد.")
+                voiceController.speak("مجوز تماس تلفنی صادر نشد.")
+            }
+            return
+        }
         if (requestCode == recordAudioRequest) {
             if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) beginVoice()
             else setStatus("مجوز میکروفون داده نشد؛ قابلیت صوتی غیرفعال ماند.")
@@ -187,7 +1015,7 @@ class MainActivity : Activity() {
         voiceActive = false
         if (::voiceButton.isInitialized) {
             voiceButton.isEnabled = true
-            voiceButton.text = "شروع فرمان صوتی (محلی)"
+            voiceButton.text = "🎙  صحبت با سیا"
         }
     }
 
@@ -200,6 +1028,15 @@ class MainActivity : Activity() {
             val message = "این فرمان در فهرست مجاز نیست؛ هیچ عملیاتی اجرا نشد."
             setStatus(message)
             voiceController.speak(message)
+            return
+        }
+        if (alias == "call_father") {
+            runCatching { placeFatherCall() }
+                .onFailure {
+                    val message = "برقراری تماس ناموفق بود: " + (it.message ?: "خطای نامشخص")
+                    setStatus(message)
+                    voiceController.speak(message)
+                }
             return
         }
         runCatching { launchAllowlisted(alias) }
@@ -215,6 +1052,68 @@ class MainActivity : Activity() {
             }
     }
 
+    private fun chooseFatherContact(forImmediateCall: Boolean = false) {
+        pendingCallAfterContactSelection = forImmediateCall
+        val picker = Intent(Intent.ACTION_PICK, ContactsContract.CommonDataKinds.Phone.CONTENT_URI)
+        runCatching { startActivityForResult(picker, fatherContactRequest) }
+            .onFailure {
+                pendingCallAfterContactSelection = false
+                setStatus("انتخاب‌گر مخاطبین در این دستگاه در دسترس نیست.")
+            }
+    }
+
+    private fun fatherContactSummary(): String {
+        val name = store.fatherContactName()
+        return if (name.isBlank()) {
+            "مخاطب پدر هنوز انتخاب نشده است. یک‌بار از فهرست مخاطبین انتخابش کن."
+        } else {
+            "مخاطب تماس سریع: $name  ·  شماره در حافظهٔ رمزگذاری‌شده نگهداری می‌شود."
+        }
+    }
+
+    /** A voice command opens a confirmation dialog; it never places a call by itself. */
+    private fun placeFatherCall() {
+        val number = store.fatherContactPhone()
+        if (number.isBlank()) {
+            setStatus("برای تماس مستقیم، ابتدا مخاطب پدر را انتخاب کن.")
+            voiceController.speak("مخاطب پدر هنوز انتخاب نشده. لطفاً یک‌بار آن را انتخاب کن.")
+            chooseFatherContact(forImmediateCall = true)
+            return
+        }
+        val contactName = store.fatherContactName().ifBlank { "پدر" }
+        AlertDialog.Builder(this)
+            .setTitle("تأیید تماس")
+            .setMessage("آیا می‌خواهی همین حالا با $contactName تماس بگیری؟")
+            .setNegativeButton("انصراف", null)
+            .setPositiveButton("تماس") { _, _ -> requestCallPermissionAndPlace(number) }
+            .show()
+    }
+
+    private fun requestCallPermissionAndPlace(number: String) {
+        if (checkSelfPermission(Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
+            pendingCallAfterPermission = true
+            requestPermissions(arrayOf(Manifest.permission.CALL_PHONE), callPhoneRequest)
+            setStatus("پس از تأیید مجوز Android، تماس برقرار می‌شود.")
+            return
+        }
+        executeFatherCall(number)
+    }
+
+    private fun executeFatherCall(number: String = store.fatherContactPhone()) {
+        if (number.isBlank()) {
+            setStatus("شمارهٔ مخاطب در دسترس نیست؛ تماسی برقرار نشد.")
+            return
+        }
+        runCatching {
+            startActivity(Intent(Intent.ACTION_CALL, Uri.fromParts("tel", number, null)))
+        }.onSuccess {
+            setStatus("در حال تماس با ${store.fatherContactName().ifBlank { "پدر" }}…")
+            voiceController.speak("در حال تماس با پدر.")
+        }.onFailure {
+            setStatus("برنامهٔ تماس تلفنی در دسترس نیست: ${it.message ?: "خطای نامشخص"}")
+        }
+    }
+
     private fun launchAllowlisted(alias: String) {
         when (alias) {
             "chatgpt" -> {
@@ -227,8 +1126,41 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun addFreeProviderKeyEditor(root: LinearLayout, providerId: String, providerLabel: String) {
+        val field = EditText(this).apply {
+            hint = "کلید API · " + providerLabel
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.rgb(142, 158, 180))
+            setSingleLine(true)
+        }
+        root.addView(field, fieldParams())
+        root.addView(Button(this).apply {
+            text = "ذخیره امن کلید · " + providerLabel
+            setOnClickListener {
+                runCatching { store.saveProviderApiKey(providerId, field.text.toString()) }
+                    .onSuccess {
+                        field.text.clear()
+                        setStatus("کلید " + providerLabel + " در حافظهٔ رمزگذاری‌شده ذخیره شد.")
+                    }
+                    .onFailure { setStatus(it.message ?: "ذخیرهٔ کلید ناموفق بود.") }
+            }
+        }, buttonParams())
+        root.addView(Button(this).apply {
+            text = "حذف کلید · " + providerLabel
+            setOnClickListener {
+                runCatching { store.clearProviderApiKey(providerId) }
+                    .onSuccess {
+                        field.text.clear()
+                        setStatus("کلید " + providerLabel + " حذف شد.")
+                    }
+                    .onFailure { setStatus(it.message ?: "حذف کلید ناموفق بود.") }
+            }
+        }, buttonParams())
+    }
+
     private fun fieldParams() = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-        bottomMargin = 16
+        bottomMargin = (12 * resources.displayMetrics.density).toInt()
     }
     private fun buttonParams() = fieldParams()
     private fun setBusy(message: String) = runOnUiThread { status.text = message }
@@ -243,7 +1175,16 @@ class MainActivity : Activity() {
         )
     }
 
+    override fun onResume() {
+        super.onResume()
+        activityInForeground = true
+        if (::fatherContactStatus.isInitialized) fatherContactStatus.text = fatherContactSummary()
+        updateExecutionUi()
+    }
+
     override fun onPause() {
+        activityInForeground = false
+        updateExecutionUi()
         if (voiceActive) {
             voiceController.cancel()
             voiceActive = false
@@ -258,6 +1199,7 @@ class MainActivity : Activity() {
     override fun onDestroy() {
         if (::voiceController.isInitialized) voiceController.close()
         executor.shutdown()
+        plannerExecutor.shutdown()
         super.onDestroy()
     }
 }
