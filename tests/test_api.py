@@ -85,3 +85,51 @@ def test_assistant_chat_rejects_blank_oversized_and_unknown_fields(tmp_path):
     assert c.post("/v1/assistant/chat", headers=headers, json={"prompt": "x" * 8001}).status_code == 422
     assert c.post("/v1/assistant/chat", headers=headers, json={"prompt": "hi", "shell": "no"}).status_code == 422
     assert c.post("/v1/assistant/chat", headers=headers, json={"prompt": "hi", "mode": "magic"}).status_code == 422
+
+
+
+def test_schedule_idempotency_returns_the_original_task(tmp_path):
+    c = client(tmp_path)
+    headers = {
+        "Authorization": f"Bearer {TOKEN}",
+        "Idempotency-Key": "schedule-chatgpt-2026-unique",
+    }
+    future = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+    payload = {"action": "launch_app", "app_alias": "chatgpt", "run_at": future}
+
+    first = c.post("/v1/tasks", headers=headers, json=payload)
+    replay = c.post("/v1/tasks", headers=headers, json=payload)
+
+    assert first.status_code == 201
+    assert replay.status_code == 201
+    assert replay.json()["task_id"] == first.json()["task_id"]
+    assert len(c.get("/v1/tasks", headers=headers).json()["tasks"]) == 1
+
+
+def test_schedule_idempotency_rejects_key_reuse_with_different_payload(tmp_path):
+    c = client(tmp_path)
+    headers = {
+        "Authorization": f"Bearer {TOKEN}",
+        "Idempotency-Key": "schedule-key-conflict-2026",
+    }
+    future = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+    first = {"action": "launch_app", "app_alias": "notepad", "run_at": future}
+    different = {"action": "launch_app", "app_alias": "calculator", "run_at": future}
+
+    assert c.post("/v1/tasks", headers=headers, json=first).status_code == 201
+    conflict = c.post("/v1/tasks", headers=headers, json=different)
+
+    assert conflict.status_code == 409
+    assert len(c.get("/v1/tasks", headers=headers).json()["tasks"]) == 1
+
+
+def test_schedule_idempotency_key_is_bounded(tmp_path):
+    c = client(tmp_path)
+    headers = {
+        "Authorization": f"Bearer {TOKEN}",
+        "Idempotency-Key": "x" * 129,
+    }
+    future = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+    payload = {"action": "launch_app", "app_alias": "notepad", "run_at": future}
+
+    assert c.post("/v1/tasks", headers=headers, json=payload).status_code == 422

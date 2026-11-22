@@ -6,6 +6,8 @@ process stopped is marked unknown, never replayed. Pending tasks more than
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -42,14 +44,32 @@ class TaskStore:
             db.execute(
                 "CREATE INDEX IF NOT EXISTS idx_tasks_due ON scheduled_tasks(status,run_at)"
             )
+            db.execute(
+                """CREATE TABLE IF NOT EXISTS task_idempotency (
+                    idempotency_key TEXT PRIMARY KEY,
+                    request_digest TEXT NOT NULL,
+                    task_id TEXT NOT NULL REFERENCES scheduled_tasks(task_id),
+                    created_at TEXT NOT NULL
+                )"""
+            )
 
     def _connect(self) -> sqlite3.Connection:
         db = sqlite3.connect(self.path, timeout=10)
         db.row_factory = sqlite3.Row
+        db.execute("PRAGMA foreign_keys = ON")
         return db
 
-    def create_launch(self, run_at: datetime, alias: str) -> dict:
+    def create_launch(
+        self, run_at: datetime, alias: str, *, idempotency_key: str | None = None
+    ) -> dict:
         scheduled = _utc(run_at)
+        request_digest = hashlib.sha256(
+            json.dumps(
+                {"run_at": scheduled.isoformat(), "app_alias": alias},
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()
         task = {
             "task_id": str(uuid4()),
             "run_at": scheduled.isoformat(),
@@ -58,12 +78,41 @@ class TaskStore:
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
         with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            if idempotency_key is not None:
+                existing = db.execute(
+                    """SELECT request_digest, task_id FROM task_idempotency
+                       WHERE idempotency_key=?""",
+                    (idempotency_key,),
+                ).fetchone()
+                if existing is not None:
+                    if existing["request_digest"] != request_digest:
+                        raise ValueError("Idempotency key was already used for a different request")
+                    row = db.execute(
+                        "SELECT * FROM scheduled_tasks WHERE task_id=?",
+                        (existing["task_id"],),
+                    ).fetchone()
+                    if row is None:
+                        raise RuntimeError("Idempotency record references a missing task")
+                    return self._public_task(row)
             db.execute(
                 """INSERT INTO scheduled_tasks
                    (task_id,run_at,app_alias,status,created_at)
                    VALUES(?,?,?,?,?)""",
                 (task["task_id"], task["run_at"], alias, "pending", task["created_at"]),
             )
+            if idempotency_key is not None:
+                db.execute(
+                    """INSERT INTO task_idempotency
+                       (idempotency_key,request_digest,task_id,created_at)
+                       VALUES(?,?,?,?)""",
+                    (
+                        idempotency_key,
+                        request_digest,
+                        task["task_id"],
+                        task["created_at"],
+                    ),
+                )
         return task
 
     @staticmethod

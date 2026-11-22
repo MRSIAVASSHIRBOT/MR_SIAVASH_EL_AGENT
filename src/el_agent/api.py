@@ -111,8 +111,21 @@ def create_app(*, token: str | None = None, store: TaskStore | None = None, scre
         except ValueError as exc: raise HTTPException(status_code=404,detail="Application alias is not allowlisted") from exc
         except RuntimeError as exc: raise HTTPException(status_code=501,detail=str(exc)) from exc
     @app.post("/v1/tasks",status_code=201)
-    async def create_task(payload: ScheduleRequest, _: None = Depends(auth)):
-        return db.create_launch(payload.run_at,payload.app_alias)
+    async def create_task(
+        payload: ScheduleRequest,
+        _: None = Depends(auth),
+        idempotency_key: str | None = Header(
+            default=None, alias="Idempotency-Key", min_length=1, max_length=128
+        ),
+    ):
+        try:
+            return db.create_launch(
+                payload.run_at,
+                payload.app_alias,
+                idempotency_key=idempotency_key,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
     @app.get("/v1/tasks")
     async def list_tasks(_: None = Depends(auth)):
         return {"tasks":db.list_tasks()}
