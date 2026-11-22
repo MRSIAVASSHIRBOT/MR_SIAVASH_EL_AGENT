@@ -213,7 +213,9 @@ class GeminiFreePlanProvider(
 
     init {
         require(apiKey.length in 20..512 && apiKey.none { it.isWhitespace() }) { "کلید Gemini نامعتبر است." }
-        require(model.matches(Regex("[A-Za-z0-9._-]{1,100}"))) { "شناسهٔ مدل Gemini نامعتبر است." }
+        require(model == DEFAULT_MODEL) {
+            "برای جلوگیری از هزینه، Gemini فقط با مدل رایگان ${DEFAULT_MODEL} مجاز است."
+        }
     }
 
     override fun generate(systemPrompt: String, userPrompt: String): String {
