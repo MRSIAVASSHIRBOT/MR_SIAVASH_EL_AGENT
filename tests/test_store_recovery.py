@@ -81,6 +81,36 @@ def test_task_store_rejects_naive_datetimes(tmp_path: Path):
         store.claim_due(datetime(2026, 11, 20))
 
 
+def test_scheduler_redacts_sensitive_action_exception_details(tmp_path: Path, monkeypatch):
+    store = TaskStore(tmp_path / "tasks.sqlite3")
+    now = datetime.now(timezone.utc)
+    task = store.create_launch(now - timedelta(seconds=1), "notepad")
+    sensitive_detail = "C:/Users/Siavash/private-folder"
+
+    def fail_launch(_alias):
+        raise RuntimeError(sensitive_detail)
+
+    monkeypatch.setattr(service, "launch_app", fail_launch)
+
+    async def run_once():
+        worker = asyncio.create_task(service.scheduler_loop(store))
+        for _ in range(100):
+            rows = store.list_tasks()
+            if rows and rows[0]["status"] == "failed":
+                break
+            await asyncio.sleep(0.01)
+        worker.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await worker
+
+    asyncio.run(run_once())
+
+    row = next(item for item in store.list_tasks() if item["task_id"] == task["task_id"])
+    assert row["status"] == "failed"
+    assert row["error"] == "RuntimeError: scheduled action failed"
+    assert sensitive_detail not in row["error"]
+
+
 def test_scheduler_startup_reconciles_running_rows_before_polling(tmp_path: Path, monkeypatch):
     store = TaskStore(tmp_path / "tasks.sqlite3")
     now = datetime.now(timezone.utc)
