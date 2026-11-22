@@ -70,6 +70,19 @@ class FreeProviderRouterTest {
         assertNotNull(ProviderFailurePolicy.retryAfterSeconds("Wed, 21 Oct 2015 07:28:00 GMT", 0L))
     }
 
+    @Test fun geminiPlannerRejectsModelsOutsideTheFreeTierModel() {
+        assertThrows(IllegalArgumentException::class.java) {
+            GeminiFreePlanProvider("test-api-key-that-is-long-enough", "gemini-4-carbon")
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            GeminiFreePlanProvider("test-api-key-that-is-long-enough", "gemini-4-argon")
+        }
+        assertEquals(
+            "gemini-4-hydrogen",
+            GeminiFreePlanProvider("test-api-key-that-is-long-enough").model
+        )
+    }
+
     @Test fun openRouterRejectsPotentiallyBillableModelIds() {
         assertThrows(IllegalArgumentException::class.java) {
             OpenRouterFreePlanProvider("test-api-key-that-is-long-enough", "openai/gpt-oss-20b")
