@@ -2,6 +2,8 @@
 
 **Personal Digital Operator — Windows desktop + Android companion preview**
 
+**Operational capabilities:** [AWI, GPI, CGI, PAIOS, gap detection, planning, self-evaluation, quality and security requirements](docs/OPERATIONAL_CAPABILITIES.md).
+
 A device-side companion for the MR_SIAVASH ecosystem. Windows provides the local API, CLI, desktop control center, and a draft outbound Hub task consumer. The Android companion adds owner-initiated Hub pairing, encrypted credentials, periodic heartbeat, a locally validated AI planner using configured free providers, optional offline models, and a foreground-only owner-approved Hub app-launch consumer. Hub Staging and physical-device acceptance remain pending.
 
 ## What works in this MVP
