@@ -52,6 +52,81 @@ class SecureStore(private val context: android.content.Context) {
         }
     }
 
+
+    @Synchronized
+    fun saveCloudApiKey(apiKey: String) {
+        require(apiKey.length in 20..512 && apiKey.none { it.isWhitespace() }) {
+            "Cloud API key is invalid."
+        }
+        val value = read()
+        value.put("cloud_api_key", apiKey)
+        write(value)
+    }
+
+    @Synchronized
+    fun cloudApiKey(): String = read().optString("cloud_api_key", "")
+
+    @Synchronized
+    fun clearCloudApiKey() {
+        val value = read()
+        value.remove("cloud_api_key")
+        write(value)
+    }
+
+    /** Provider-specific keys are kept inside the same Android Keystore AES-GCM encrypted payload. */
+    @Synchronized
+    fun saveProviderApiKey(providerId: String, apiKey: String) {
+        require(providerId in setOf("gemini", "openrouter")) { "Unsupported free provider." }
+        require(apiKey.length in 20..512 && apiKey.none { it.isWhitespace() }) {
+            "Provider API key is invalid."
+        }
+        val value = read()
+        value.put("free_provider_" + providerId + "_api_key", apiKey)
+        write(value)
+    }
+
+    @Synchronized
+    fun providerApiKey(providerId: String): String {
+        require(providerId in setOf("gemini", "openrouter")) { "Unsupported free provider." }
+        return read().optString("free_provider_" + providerId + "_api_key", "")
+    }
+
+    @Synchronized
+    fun clearProviderApiKey(providerId: String) {
+        require(providerId in setOf("gemini", "openrouter")) { "Unsupported free provider." }
+        val value = read()
+        value.remove("free_provider_" + providerId + "_api_key")
+        write(value)
+    }
+
+    /** Stores the user-selected family contact inside the existing AES-GCM encrypted payload. */
+    @Synchronized
+    fun saveFatherContact(name: String, phone: String) {
+        val safeName = name.trim().take(80)
+        val safePhone = phone.filter { it.isDigit() || it == '+' }
+        require(safeName.isNotBlank()) { "نام مخاطب معتبر نیست." }
+        require(safePhone.length in 3..20) { "شمارهٔ مخاطب معتبر نیست." }
+        val value = read()
+        value.put("father_contact_name", safeName)
+        value.put("father_contact_phone", safePhone)
+        write(value)
+    }
+
+    @Synchronized
+    fun fatherContactName(): String = read().optString("father_contact_name", "")
+
+    @Synchronized
+    fun fatherContactPhone(): String = read().optString("father_contact_phone", "")
+
+    @Synchronized
+    fun clearFatherContact() {
+        val value = read()
+        value.remove("father_contact_name")
+        value.remove("father_contact_phone")
+        write(value)
+    }
+
+    @Synchronized
     fun clearCredentialsPreservingIdentity() {
         val value = read()
         value.remove("hub_url")
@@ -63,6 +138,7 @@ class SecureStore(private val context: android.content.Context) {
         write(value)
     }
 
+    @Synchronized
     fun deviceId(): String {
         val value = read()
         val current = value.optString("device_id", "")
