@@ -72,6 +72,40 @@ class HubClientTransportTest {
     }
 
     @Test
+    fun rejectsCoercedOutcomeMarkersAndNonStringIdentityFields() {
+        val stringMarker = JSONObject().put(
+            "task",
+            JSONObject()
+                .put("task_id", validClaim.taskId)
+                .put("status", "reported_succeeded")
+                .put("outcome_verified", "false")
+        )
+        val numericMarker = JSONObject().put(
+            "task",
+            JSONObject()
+                .put("task_id", validClaim.taskId)
+                .put("status", "reported_succeeded")
+                .put("outcome_verified", 0)
+        )
+        val numericTaskId = JSONObject().put(
+            "task",
+            JSONObject()
+                .put("task_id", 12345)
+                .put("status", "reported_succeeded")
+                .put("outcome_verified", false)
+        )
+        assertTrue(runCatching {
+            validateReportedTaskOutcome(stringMarker, validClaim, succeeded = true)
+        }.isFailure)
+        assertTrue(runCatching {
+            validateReportedTaskOutcome(numericMarker, validClaim, succeeded = true)
+        }.isFailure)
+        assertTrue(runCatching {
+            validateReportedTaskOutcome(numericTaskId, validClaim, succeeded = true)
+        }.isFailure)
+    }
+
+    @Test
     fun rejectsVerifiedOrMissingOutcomeVerificationMarkers() {
         val verified = runCatching {
             validateReportedTaskOutcome(
