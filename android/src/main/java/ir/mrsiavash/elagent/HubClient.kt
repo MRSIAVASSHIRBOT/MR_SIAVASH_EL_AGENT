@@ -103,11 +103,17 @@ internal fun validateReportedTaskOutcome(
 ) {
     val reported = response.optJSONObject("task")
         ?: throw IllegalStateException("Hub did not confirm that the task outcome was recorded.")
+    val taskId = reported.opt("task_id")
+    val status = reported.opt("status")
+    val outcomeVerified = reported.opt("outcome_verified")
     val expectedStatus = if (succeeded) "reported_succeeded" else "reported_failed"
     require(
-        reported.optString("task_id") == claim.taskId &&
-            reported.optString("status") == expectedStatus &&
-            reported.optBoolean("outcome_verified", true) == false
+        taskId is String &&
+            taskId == claim.taskId &&
+            status is String &&
+            status == expectedStatus &&
+            outcomeVerified is Boolean &&
+            !outcomeVerified
     ) {
         "Hub returned an unexpected task outcome record."
     }
