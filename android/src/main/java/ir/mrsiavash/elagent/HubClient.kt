@@ -96,6 +96,23 @@ internal fun readBoundedHubResponse(response: okhttp3.Response): String {
     return output.toByteArray().toString(Charsets.UTF_8)
 }
 
+internal fun validateReportedTaskOutcome(
+    response: JSONObject,
+    claim: AndroidDeviceTaskClaim,
+    succeeded: Boolean
+) {
+    val reported = response.optJSONObject("task")
+        ?: throw IllegalStateException("Hub did not confirm that the task outcome was recorded.")
+    val expectedStatus = if (succeeded) "reported_succeeded" else "reported_failed"
+    require(
+        reported.optString("task_id") == claim.taskId &&
+            reported.optString("status") == expectedStatus &&
+            reported.optBoolean("outcome_verified", true) == false
+    ) {
+        "Hub returned an unexpected task outcome record."
+    }
+}
+
 internal fun buildHubHttpClient(): OkHttpClient = OkHttpClient.Builder()
     .connectTimeout(10, TimeUnit.SECONDS)
     .readTimeout(12, TimeUnit.SECONDS)
@@ -294,16 +311,7 @@ class HubClient(private val store: SecureStore) {
             saved.getString("hub_url"), "/devices/tasks/${claim.taskId}/complete", payload,
             saved.getString("access_token"), saved.getString("device_id")
         )
-        val reported = response.optJSONObject("task")
-            ?: throw IllegalStateException("Hub did not confirm that the task outcome was recorded.")
-        val expectedStatus = if (succeeded) "reported_succeeded" else "reported_failed"
-        require(
-            reported.optString("task_id") == claim.taskId &&
-            reported.optString("status") == expectedStatus &&
-            reported.optBoolean("outcome_verified", true) == false
-        ) {
-            "Hub returned an unexpected task outcome record."
-        }
+        validateReportedTaskOutcome(response, claim, succeeded)
     }
 
     fun heartbeat(): String = HubCredentialLock.withLock {
