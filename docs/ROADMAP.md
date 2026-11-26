@@ -1,5 +1,8 @@
 # Roadmap
 
+> **Portfolio alignment — 2026-11-27:** This roadmap is the EL_AGENT-owned local/device workstream D0–D14 in the [canonical four-product phase inventory](https://github.com/MRSIAVASSHIRBOT/MR_SIAVASH_HUB_AI/blob/main/docs/roadmap/FOUR_PRODUCT_TECHNICAL_PHASES.md). HUB is an optional integration; Windows/Android local operation remains an independent product requirement. Phase completion requires exact-main CI plus physical-device/operational acceptance where specified.
+
+
 ## Windows usable MVP
 - [x] Local-only API design and implementation
 - [x] Bearer token setup and authentication
