@@ -53,6 +53,10 @@ def load_token(path: Path | None = None) -> str:
     # on platforms that support it. fstat also rejects directories, pipes and devices.
     if not hasattr(os, "O_NOFOLLOW") and destination.is_symlink():
         raise RuntimeError("API token file could not be safely read.")
+    # Windows does not allow opening directories with ordinary read flags;
+    # classify them before os.open so the failure is consistent across platforms.
+    if destination.is_dir():
+        raise RuntimeError("API token file must be a regular file.")
     flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
     descriptor = -1
     try:
